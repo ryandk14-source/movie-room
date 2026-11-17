@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<!-- This page may only talk to Google's Apps Script addresses (the Movie Night script) and load its two fonts. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://script.google.com https://script.googleusercontent.com; media-src blob: mediastream:; img-src data:; worker-src blob:; child-src blob:; base-uri 'none'; form-action 'none'">
+<title>Watch together - Movie Night</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23E2472B'/%3E%3Cpath d='M12 9l12 7-12 7z' fill='%23FBEFD5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Caprasimo&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* The same black screen and white type as the Movie Night list, with the red poster's colours kept for the ticket. */
+  --black: #000000;
+  --white: #ffffff;
+  --ash: #b3b3b3;
+  --line: #303030;
+  --panel: #161616;
+  --tomato: #E2472B;
+  --cream: #FBEFD5;
+  --butter: #FFC83D;
+  --font: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --poster-font: "Caprasimo", "Cooper Black", "Rockwell Extra Bold", Georgia, serif;
+  --pad: 16px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; height: 100%; }
+body { margin: 0; min-height: 100%; background: var(--black); color: var(--white); font-family: var(--font); font-size: 1rem; line-height: 1.4; }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--white); outline-offset: 3px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+h1, h2, p { margin: 0; }
+
+/* ---------- shared pieces ---------- */
+.t-xl, .t-l, .t-m { margin: 0; font-stretch: 62%; font-weight: 800; text-transform: uppercase; line-height: .9; overflow-wrap: anywhere; text-wrap: balance; }
+.t-xl { font-size: clamp(2.75rem, 13vw, 5.5rem); }
+.t-l { font-size: clamp(1.75rem, 7vw, 2.5rem); }
+.t-m { font-size: 1.375rem; line-height: 1; }
+.dim { color: var(--ash); }
+.fine { color: var(--ash); font-size: .875rem; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 8px 20px; border: 1.5px solid var(--white); border-radius: 999px; background: var(--white); color: var(--black); font-weight: 700; cursor: pointer; text-decoration: none; }
+.btn:active { transform: scale(.97); }
+.btn-line { background: transparent; color: var(--white); }
+.btn-small { min-height: 40px; padding: 5px 15px; font-size: .9375rem; }
+.btn:disabled { opacity: .45; cursor: default; }
+.link { min-height: 40px; padding: 6px 2px; border: 0; background: none; color: inherit; font-weight: 600; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 5px 13px; border: 1.5px solid var(--line); border-radius: 999px; background: transparent; color: var(--white); font-size: .9375rem; font-weight: 500; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--white); background: var(--white); color: var(--black); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.field { width: 100%; min-height: 46px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--white); }
+.field:focus-visible { outline-offset: 0; border-color: var(--white); }
+label, .label { display: block; font-size: .875rem; font-weight: 600; color: var(--ash); }
+.msg { padding: 10px 12px; border-left: 3px solid var(--butter); background: var(--panel); font-size: .9375rem; }
+
+/* ---------- the pages before the room: start, setup, home, closed ---------- */
+.page { max-width: 900px; margin: 0 auto; padding: 14px var(--pad) 48px; padding-top: max(14px, env(safe-area-inset-top)); }
+.mark { font-size: 1.0625rem; font-weight: 800; font-stretch: 80%; }
+.page .t-xl { margin-top: clamp(28px, 9vh, 96px); }
+.lead { max-width: 34em; margin-top: 16px; font-size: 1.125rem; }
+.page section { margin-top: 8px; }
+.stack > * + * { margin-top: 14px; }
+.who-row { margin-top: 26px; }
+.choices { display: grid; gap: 14px; margin-top: 22px; }
+.choice { padding: 18px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--panel); }
+.choice h2 { font-size: 1.1875rem; font-weight: 700; }
+.choice p { margin-top: 6px; color: var(--ash); }
+.choice .btn { margin-top: 14px; }
+.join-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 12px; }
+.join-form > div { flex: 1 1 150px; }
+.join-form .field { margin-top: 6px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.join-form .btn { margin-top: 0; }
+.setup-form { max-width: 34em; margin-top: 22px; }
+.setup-form .field { margin-top: 6px; }
+.setup-form .btn { margin-top: 12px; }
+.notes { margin-top: 30px; color: var(--ash); font-size: .9375rem; }
+.notes summary { cursor: pointer; font-weight: 600; color: var(--white); }
+.notes dl { margin: 12px 0 0; }
+.notes dt { margin-top: 10px; font-weight: 700; color: var(--white); }
+.notes dd { margin: 4px 0 0; overflow-wrap: anywhere; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8125rem; }
+@media (min-width: 720px) {
+  :root { --pad: clamp(24px, 4vw, 60px); }
+  .choices { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- the room ---------- */
+.stage { position: fixed; inset: 0; overflow: hidden; background: var(--black); }
+.stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--black); }
+.top, .deck { position: absolute; left: 0; right: 0; z-index: 5; transition: opacity .25s; }
+.top { top: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px var(--pad) 46px; padding-top: max(12px, env(safe-area-inset-top)); background: linear-gradient(rgb(0 0 0 / .82), rgb(0 0 0 / 0)); pointer-events: none; }
+.top-title { min-width: 0; text-shadow: 0 1px 12px rgb(0 0 0 / .9); }
+.pill { flex: none; max-width: 62%; padding: 5px 12px; border-radius: 999px; background: rgb(0 0 0 / .6); border: 1.5px solid rgb(255 255 255 / .35); font-size: .875rem; font-weight: 600; text-align: right; }
+.pill.is-good { border-color: var(--white); }
+.pill.is-bad { border-color: var(--butter); color: var(--butter); }
+.deck { bottom: 0; padding: 54px var(--pad) 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / .88)); }
+.deck-seek { display: flex; align-items: center; gap: 10px; font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.deck-seek input { flex: 1; min-width: 0; height: 28px; margin: 0; accent-color: var(--white); cursor: pointer; }
+.deck-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.deck-gap { flex: 1; }
+.round { display: inline-grid; place-items: center; flex: none; width: 48px; height: 48px; padding: 0; border: 1.5px solid rgb(255 255 255 / .5); border-radius: 50%; background: rgb(0 0 0 / .5); color: var(--white); font-size: .8125rem; font-weight: 700; cursor: pointer; }
+.round svg { width: 22px; height: 22px; fill: currentColor; }
+.round.is-main { width: 56px; height: 56px; border-color: var(--white); background: var(--white); color: var(--black); }
+.round .i-pause, .round.is-playing .i-play { display: none; }
+.round.is-playing .i-pause { display: block; }
+.round:disabled, .deck-seek input:disabled { opacity: .4; cursor: default; }
+.deck .chip { min-height: 44px; border-color: rgb(255 255 255 / .5); background: rgb(0 0 0 / .5); font-weight: 600; }
+.deck .chip.is-on { border-color: var(--white); background: var(--white); color: var(--black); }
+.deck .chip.is-bad { border-color: var(--butter); color: var(--butter); }
+.stage.is-idle { cursor: none; }
+.stage.is-idle .top, .stage.is-idle .deck { opacity: 0; pointer-events: none; }
+
+/* what sits over the picture: the invite, the door, waiting */
+.veil { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; overflow: auto; padding: 70px var(--pad) 140px; background: rgb(0 0 0 / .8); }
+.stage.no-deck .deck { display: none; }
+.stage.no-deck .veil { padding-bottom: 24px; }
+.card { width: min(100%, 560px); }
+.card > * + * { margin-top: 14px; }
+.card .t-l + p { margin-top: 12px; }
+.ticket { position: relative; padding: 18px 26px 16px; border-radius: 12px; background: var(--cream); color: #1b1b1b; text-align: center;
+  -webkit-mask: radial-gradient(circle 11px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 11px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+          mask: radial-gradient(circle 11px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 11px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat; }
+.ticket-small { font-size: .875rem; font-weight: 700; color: var(--tomato); }
+.ticket-code { margin: 4px 0 2px; font-family: var(--poster-font); font-size: clamp(2.5rem, 12vw, 3.75rem); line-height: 1; letter-spacing: .08em; color: var(--tomato); }
+.ticket-film { font-size: .9375rem; font-weight: 600; overflow-wrap: anywhere; }
+.status { font-weight: 600; }
+.status::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 9px; border-radius: 50%; background: var(--butter); }
+.status.is-good::before { background: #7ddc8a; }
+.filmline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); }
+.filmline p { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+
+/* the room's settings */
+.drawer { position: absolute; z-index: 6; right: 0; top: 0; bottom: 0; width: min(100%, 360px); overflow: auto; padding: 14px 18px 22px; padding-top: max(14px, env(safe-area-inset-top)); padding-bottom: max(22px, env(safe-area-inset-bottom)); background: var(--panel); border-left: 1.5px solid var(--line); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; }
+.drawer-head h2 { font-size: 1.375rem; font-stretch: 62%; font-weight: 800; text-transform: uppercase; }
+.x { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; font-size: 1.75rem; line-height: 1; cursor: pointer; }
+.drawer section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.drawer section > * + * { margin-top: 10px; }
+.d-code { font-family: var(--poster-font); font-size: 1.75rem; letter-spacing: .08em; color: var(--butter); }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.meter i { display: block; width: 0; height: 100%; background: #7ddc8a; }
+.drawer input[type="range"] { display: block; width: 100%; height: 28px; margin: 4px 0 0; accent-color: var(--white); }
+.drawer select { width: 100%; min-height: 44px; margin-top: 6px; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--black); color: var(--white); }
+.toast { position: absolute; z-index: 7; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 9px 16px; border-radius: 999px; background: var(--white); color: var(--black); font-weight: 700; font-size: .9375rem; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.toast.is-up { opacity: 1; }
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: #e4e4e4; border-color: #e4e4e4; }
+  .btn-line:hover { background: rgb(255 255 255 / .12); border-color: var(--white); }
+  .chip:hover, .round:hover { border-color: var(--white); }
+  .link:hover { text-decoration-thickness: 2px; }
+}
+@media (max-width: 560px) {
+  .drawer { top: auto; left: 0; width: 100%; max-height: 82%; border-left: 0; border-top: 1.5px solid var(--line); border-radius: 16px 16px 0 0; }
+  .round { width: 44px; height: 44px; }
+  .round.is-main { width: 52px; height: 52px; }
+  .deck-row { gap: 6px; }
+  .deck .chip { padding: 5px 11px; }
+}
+@media (max-height: 460px) {
+  .veil { padding-top: 54px; padding-bottom: 118px; place-items: start center; }
+  .deck { padding-top: 30px; }
+  .toast { bottom: 110px; }
+}
+@media (prefers-reduced-motion: reduce) { .top, .deck, .toast { transition: none; } }
+</style>
+</head>
+<body data-view="start">
+<p class="visually-hidden" id="say" role="status" aria-live="polite"></p>
+<noscript><p style="padding:16px">This page needs JavaScript switched on.</p></noscript>
+
+<main class="page" id="page">
+  <p class="mark">Movie Night</p>
+  <h1 class="t-xl">Watch together</h1>
+
+  <section id="startView"><p class="lead dim">Opening&hellip;</p></section>
+
+  <section id="setupView" hidden>
+    <p class="lead">This page plays a film file from one computer to the other person's screen, live, with shared controls and voice. First it needs to know which Movie Night list it belongs to.</p>
+    <form class="setup-form" id="setupForm" novalidate>
+      <label for="setupLink">Your Movie Night link</label>
+      <input class="field" id="setupLink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
+      <button class="btn" type="submit" id="setupBtn">Connect</button>
+    </form>
+    <p class="msg" id="setupMsg" hidden style="margin-top:16px;max-width:34em"></p>
+  </section>
+
+  <section id="homeView" hidden>
+    <p class="lead">One of you plays a film file on a computer. The other watches it as it plays. Either of you can pause or skip, and you can talk while it runs.</p>
+    <p class="msg" id="homeMsg" hidden style="margin-top:16px;max-width:34em"></p>
+    <div class="row who-row" id="whoRow">
+      <span class="label" id="whoLabel">You are</span>
+      <button type="button" class="chip" id="who-a" aria-pressed="true">Person 1</button>
+      <button type="button" class="chip" id="who-b" aria-pressed="false">Person 2</button>
+    </div>
+    <div class="choices">
+      <div class="choice">
+        <h2>Play a film from this device</h2>
+        <p id="hostNote">You choose a video file here. It plays on this screen and the other person sees it live. The file is not uploaded or stored anywhere.</p>
+        <button type="button" class="btn" id="hostBtn">Host a film</button>
+      </div>
+      <div class="choice">
+        <h2>Join a room</h2>
+        <p>If the other person is hosting, type the code from their screen, or open the link they sent.</p>
+        <form class="join-form" id="joinForm" novalidate>
+          <div>
+            <label for="joinCode">Room code</label>
+            <input class="field" id="joinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="10" placeholder="ABC234">
+          </div>
+          <button class="btn btn-line" type="submit">Join</button>
+        </form>
+        <p class="msg" id="joinMsg" hidden style="margin-top:12px"></p>
+      </div>
+    </div>
+    <details class="notes">
+      <summary>Add a Watch together button to the Movie Night list</summary>
+      <p style="margin-top:10px">In the Apps Script editor, open Project Settings, then Script Properties, and add these two. Then the list shows a Watch together button that opens this page.</p>
+      <dl>
+        <dt>ROOM_URL</dt><dd id="noteRoom"></dd>
+        <dt>APP_URL</dt><dd id="noteApp"></dd>
+      </dl>
+    </details>
+  </section>
+
+  <p class="fine" id="versionLine" style="margin-top:34px">Movie Night room, version 5.</p>
+
+  <section id="closedView" hidden>
+    <p class="lead" id="closedText"></p>
+    <p style="margin-top:20px"><button type="button" class="btn" id="againBtn">Back to the start</button></p>
+  </section>
+</main>
+
+<div class="stage" id="stage" hidden>
+  <video id="film" playsinline preload="auto"></video>
+  <audio id="voice" autoplay></audio>
+  <input type="file" id="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv" hidden>
+
+  <header class="top" id="top">
+    <p class="t-m top-title" id="topTitle"></p>
+    <p class="pill" id="pill"></p>
+  </header>
+
+  <div class="veil" id="veil" hidden>
+    <!-- the host's card: the invite and the film -->
+    <div class="card" id="cardLobby" hidden>
+      <div class="ticket">
+        <p class="ticket-small">Movie Night &middot; admit two</p>
+        <p class="ticket-code" id="lobbyCode"></p>
+        <p class="ticket-film" id="lobbyFilm">Room code</p>
+      </div>
+      <p class="status" id="lobbyStatus"></p>
+      <p id="lobbyText"></p>
+      <div class="row">
+        <button type="button" class="btn" id="copyBtn">Copy the invite link</button>
+        <button type="button" class="btn btn-line" id="shareBtn" hidden>Share it</button>
+      </div>
+      <div class="filmline">
+        <p id="lobbyFile">No film chosen yet.</p>
+        <button type="button" class="btn btn-small btn-line" id="pickBtn">Choose a video file</button>
+      </div>
+      <p class="msg" id="lobbyMsg" hidden></p>
+      <p><button type="button" class="btn btn-line" id="startBtn" disabled>Go to the film</button></p>
+    </div>
+    <!-- the guest's cards -->
+    <div class="card" id="cardDoor" hidden>
+      <h2 class="t-l" id="doorTitle">Join the room</h2>
+      <p id="doorText"></p>
+      <p><button type="button" class="btn" id="joinBtn">Join the room</button></p>
+      <p class="fine">Your browser will ask to use the microphone so you can talk during the film. You can say no and still watch.</p>
+    </div>
+    <div class="card" id="cardWait" hidden>
+      <h2 class="t-l" id="waitTitle"></h2>
+      <p id="waitText"></p>
+    </div>
+    <div class="card" id="cardTap" hidden>
+      <p><button type="button" class="btn" id="tapBtn">Tap to start the picture and sound</button></p>
+    </div>
+  </div>
+
+  <footer class="deck" id="deck">
+    <div class="deck-seek">
+      <span id="tNow">0:00</span>
+      <input type="range" id="seek" min="0" max="0" step="1" value="0" aria-label="Position in the film" disabled>
+      <span id="tAll">0:00</span>
+    </div>
+    <div class="deck-row">
+      <button type="button" class="round" id="backBtn" aria-label="Back 10 seconds" disabled>-10</button>
+      <button type="button" class="round is-main" id="playBtn" aria-label="Play" disabled>
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+      </button>
+      <button type="button" class="round" id="fwdBtn" aria-label="Forward 10 seconds" disabled>+10</button>
+      <span class="deck-gap"></span>
+      <button type="button" class="chip" id="micBtn" aria-pressed="false">Mic off</button>
+      <button type="button" class="chip" id="roomBtn" aria-expanded="false" aria-controls="drawer">Room</button>
+      <button type="button" class="round" id="fullBtn" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h6v2H7v4H5zM13 5h6v6h-2V7h-4zM5 13h2v4h4v2H5zM17 13h2v6h-6v-2h4z"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <aside class="drawer" id="drawer" aria-label="Room settings" hidden>
+    <div class="drawer-head"><h2>Room</h2><button type="button" class="x" id="drawerClose" aria-label="Close">&times;</button></div>
+    <section id="dInvite">
+      <p class="label">Room code</p>
+      <p class="d-code" id="dCode"></p>
+      <div class="row">
+        <button type="button" class="btn btn-small" id="dCopy">Copy the invite link</button>
+        <button type="button" class="link" id="dLobby">Show the invite</button>
+      </div>
+    </section>
+    <section>
+      <p class="label">Your microphone</p>
+      <p id="dMicText"></p>
+      <div class="meter" id="meter" hidden><i id="meterBar"></i></div>
+      <p><button type="button" class="btn btn-small btn-line" id="dMic">Turn on</button></p>
+      <p class="fine">Headphones stop the film's sound going back down your microphone as an echo.</p>
+    </section>
+    <section id="dVols">
+      <label for="filmVol">Film volume, on this device</label>
+      <input type="range" id="filmVol" min="0" max="100" step="1" value="100">
+      <label for="voiceVol" id="voiceVolLabel">Voice volume</label>
+      <input type="range" id="voiceVol" min="0" max="100" step="1" value="100">
+    </section>
+    <section>
+      <label for="quality">Picture quality</label>
+      <select id="quality"></select>
+      <p class="fine">The amounts are the most each setting can use. Lower copes better with a slow connection.</p>
+    </section>
+    <section id="dFilm">
+      <p class="label">Film</p>
+      <p id="dFilmName"></p>
+      <p><button type="button" class="btn btn-small btn-line" id="dChoose">Choose another film</button></p>
+    </section>
+    <section>
+      <p class="label">Connection</p>
+      <p class="fine" id="details">Not connected.</p>
+    </section>
+    <section>
+      <p><button type="button" class="btn btn-small btn-line" id="leaveBtn">Leave the room</button></p>
+    </section>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+/* Movie Night: the Watch together room.
+ *
+ * One person (the host) picks a video file on their computer. Their browser plays it and sends the picture and
+ * sound straight to the other person's browser (WebRTC, peer to peer). Both microphones are sent the same way.
+ * The other person's play, pause and skip presses travel back and are applied to the host's player.
+ *
+ * To find each other, each browser leaves a short technical note with the Movie Night script on Google
+ * (the address in this page's link after "app="). Nothing else leaves the two browsers, and no film is uploaded.
+ */
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const APP_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[A-Za-z0-9.\-]{1,100}|macros)\/s\/[A-Za-z0-9_\-]{10,200}\/exec$/;
+  const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
+  const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";       // no I, O, 0 or 1: they get misread
+  const KEEP = { app: "movie-room-app", me: "movie-room-me", code: "movie-room-code" };
+  const START_KBPS = 1500;                                      // where the picture's quality starts, before the connection has been measured
+  const EXTRA_BITS = 192000;                                    // the film's sound and a voice, on top of the picture
+  const QUALITY = {
+    high: { label: "High", bits: 6000000, height: 1080 },
+    mid: { label: "Medium", bits: 2500000, height: 720 },
+    low: { label: "Low", bits: 1000000, height: 480 }
+  };
+
+  const isQuality = (q) => typeof q === "string" && Object.prototype.hasOwnProperty.call(QUALITY, q);
+
+  /* ---------- small helpers ---------- */
+
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+  const isLive = (t) => !!t && t.readyState === "live";
+  function label(v, max) { return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max || 24) : ""; }
+  function store(where, key, value) {
+    try {
+      const box = where === "session" ? window.sessionStorage : window.localStorage;
+      if (value === undefined) return box.getItem(key) || "";
+      if (value === null) box.removeItem(key); else box.setItem(key, value);
+    } catch (e) { /* private browsing: nothing is remembered */ }
+    return "";
+  }
+  function clock(t, all) {
+    const s = Math.max(0, Math.floor(t || 0)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = String(s % 60).padStart(2, "0");
+    return (all || 0) >= 3600 || h ? h + ":" + String(m).padStart(2, "0") + ":" + sec : m + ":" + sec;
+  }
+  function randomText(n, chars) { const b = new Uint8Array(n); crypto.getRandomValues(b); return Array.from(b, (x) => chars[x % chars.length]).join(""); }
+  const newCode = () => randomText(6, CODE_CHARS);              // 32 characters, so every byte maps evenly
+  const newRound = () => randomText(12, "abcdefghijklmnopqrstuvwxyz234567");
+  function normCode(v) { return String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+  /** GB an hour if a setting ran at its limit the whole time: bits a second, times 3,600 seconds, over 8 bits a byte. */
+  function gbAnHour(bits) { return (bits + EXTRA_BITS) * 3600 / 8 / 1e9; }
+  function tidyName(name) {
+    let s = String(name || "").replace(/\.[A-Za-z0-9]{2,4}$/, "").replace(/[._]+/g, " ");
+    s = s.replace(/\s[\[(]?(480p|576p|720p|1080p|2160p|4k|uhd|bluray|blu-ray|brrip|bdrip|webrip|web-dl|web dl|hdtv|dvdrip|x264|x265|h264|h265|hevc|10bit|remux)\b.*$/i, "");
+    return label(s, 120) || "The film";
+  }
+
+  /* A page in a background tab has its timers slowed right down. A worker's timers are not, so waiting is timed by one.
+     If the worker cannot start, ordinary timers are used. */
+  const sleep = (() => {
+    const waiting = new Set();
+    let worker = null;
+    function run() { const now = Date.now(); waiting.forEach((w) => { if (now >= w.at) { waiting.delete(w); clearTimeout(w.spare); w.done(); } }); }
+    try {
+      worker = new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},250)"], { type: "text/javascript" })));
+      worker.onmessage = run;
+      worker.onerror = () => { worker = null; };
+    } catch (e) { worker = null; }
+    return (ms) => new Promise((done) => {
+      const w = { at: Date.now() + ms, done: done, spare: 0 };
+      w.spare = setTimeout(() => { if (waiting.delete(w)) done(); }, ms + (worker ? 1200 : 0));
+      waiting.add(w);
+    });
+  })();
+
+  /* ---------- what this page knows ---------- */
+
+  const me = { role: "", id: "a", idSet: false, code: "", app: "", film: "", names: { a: "", b: "" }, relay: null, reach: "" };
+  const peer = { mic: false };
+  const ui = { view: "start", lobby: true, drawer: false, idle: false, scrub: false, needTap: false, idleTimer: 0, toastTimer: 0 };
+  const film = { el: null, tag: new MediaStream(), cap: null, old: new Set(), a: null, v: null, file: null, next: null, url: "", title: "", w: 0, h: 0, quality: "high", seq: 0, last: { by: "", act: "" }, error: "", silent: false, fresh: true };
+  const mic = { track: null, state: "off", want: false };       // off | asking | on | blocked | none | failed
+  const live = { film: new MediaStream(), voice: new MediaStream() };
+  const host = { open: false, pending: null, trying: null, active: null, lastPoll: 0, fails: 0, loop: false, gone: "" };
+  const guest = { want: false, link: null, loop: false, fails: 0, found: null, hostId: "", title: "", since: 0, ended: "" };
+  let remote = { has: false, p: true, c: 0, d: 0, at: 0, title: "", q: "high", hid: false, sound: true, n: 0 };
+
+  const otherId = () => (me.id === "a" ? "b" : "a");
+  function nameOf(id) { return me.names[id] || (id === me.id ? "you" : "the other person"); }
+  function Name(id) { const n = nameOf(id); return n.charAt(0).toUpperCase() + n.slice(1); }
+
+  /* ---------- talking to the Movie Night script ---------- */
+
+  async function api(name, req) {
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 15000);
+    try {
+      /* Sent as plain text on purpose: that is the kind of request Apps Script accepts from another site. */
+      const res = await fetch(me.app, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ party: name, req: req || {} }),
+        signal: stop.signal, credentials: "omit", cache: "no-store", redirect: "follow", referrerPolicy: "no-referrer"
+      });
+      if (!res.ok) throw new Error("The script answered " + res.status + ".");
+      const out = await res.json();
+      if (!out || out.ok !== true) { const err = new Error(out && typeof out.error === "string" ? out.error : "The script refused that."); err.refused = true; throw err; }
+      return out.data && typeof out.data === "object" ? out.data : {};
+    } finally { clearTimeout(timer); }
+  }
+
+  function cleanLink(v) {
+    const m = String(v || "").trim().match(/^https:\/\/script\.google\.com\/[^?#\s]*\/exec/);
+    return m && APP_RE.test(m[0]) ? m[0] : "";
+  }
+
+  async function hello() {
+    const r = await api("hello");
+    const n = r.names && typeof r.names === "object" ? r.names : {};
+    me.names = { a: label(n.a), b: label(n.b) };
+    const rl = r.relay;
+    me.relay = rl && typeof rl.url === "string" && /^turns?:[A-Za-z0-9.\-]+/.test(rl.url) ? { url: rl.url, user: String(rl.user || ""), pass: String(rl.pass || "") } : null;
+    me.reach = "ok";
+  }
+
+  /* ---------- messages on screen ---------- */
+
+  function toast(text) {
+    const el = $("toast");
+    el.textContent = text; el.classList.add("is-up");
+    clearTimeout(ui.toastTimer);
+    ui.toastTimer = setTimeout(() => el.classList.remove("is-up"), 3200);
+  }
+  function say(text) { $("say").textContent = ""; setTimeout(() => { $("say").textContent = text; }, 60); }
+  function setMsg(id, text) { const el = $(id); el.textContent = text || ""; el.hidden = !text; }
+
+  function show(view) {
+    ui.view = view;
+    document.body.dataset.view = view;
+    $("page").hidden = view === "stage";
+    $("stage").hidden = view !== "stage";
+    ["start", "setup", "home", "closed"].forEach((v) => { $(v + "View").hidden = v !== view; });
+    if (view === "stage") { poke(); paint(); }
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- the page before the room ---------- */
+
+  /* Hosting needs the browser to hand over what a player is showing as live tracks. Chrome and Edge do. Safari does
+     not have it. Firefox has its own version (it also keeps an older one under a "moz" name, which is how it is told
+     apart here), and that one behaves differently and has not been tried with this page, so it is not offered. */
+  function canHost() {
+    const proto = typeof HTMLMediaElement !== "undefined" ? HTMLMediaElement.prototype : null;
+    return !!proto && typeof proto.captureStream === "function" && typeof proto.mozCaptureStream !== "function" && typeof RTCPeerConnection === "function";
+  }
+  function canJoin() { return typeof RTCPeerConnection === "function"; }
+
+  function paintHome() {
+    ["a", "b"].forEach((id) => {
+      const el = $("who-" + id);
+      el.textContent = me.names[id] || (id === "a" ? "Person 1" : "Person 2");
+      el.setAttribute("aria-pressed", String(me.idSet && me.id === id));
+    });
+    const ok = canHost();
+    $("hostBtn").disabled = !ok || !me.idSet;
+    $("whoLabel").textContent = me.idSet ? "You are" : "First, who are you?";
+    $("hostNote").textContent = !ok
+      ? "This browser cannot send a film. Hosting works in Chrome or Edge on a computer. You can still join a room from here."
+      : (me.idSet ? "You choose a video file here. It plays on this screen and the other person sees it live. The file is not uploaded or stored anywhere."
+        : "Choose who you are above, then you can host. You choose a video file here and the other person sees it live.");
+    setMsg("homeMsg", me.reach === "down" ? "This page could not reach your Movie Night script just now. Check the connection, then try hosting or joining anyway." : (canJoin() ? "" : "This browser is too old for this page. Try a current version of Chrome, Edge, Safari or Firefox."));
+    $("noteRoom").textContent = location.origin + location.pathname;
+    $("noteApp").textContent = me.app;
+  }
+
+  function setMe(id) {
+    me.id = id === "b" ? "b" : "a"; me.idSet = true;
+    store("local", KEEP.me, me.id);
+    paintHome();
+  }
+
+  async function onSetup(ev) {
+    ev.preventDefault();
+    const link = cleanLink($("setupLink").value);
+    if (!link) { setMsg("setupMsg", "That is not a Movie Night link. It starts with https://script.google.com/macros/s/ and ends with /exec."); return; }
+    $("setupBtn").disabled = true;
+    setMsg("setupMsg", "Checking the link...");
+    me.app = link;
+    try {
+      await hello();
+      store("local", KEEP.app, me.app);
+      setMsg("setupMsg", "");
+      paintHome();
+      show("home");
+    } catch (e) {
+      me.app = "";
+      setMsg("setupMsg", e && e.refused
+        ? "The script at that link answered, but not as this version of Movie Night. Paste the newest script into Apps Script and deploy a new version, then try again."
+        : "No answer from that link. Check that the newest Movie Night script is deployed (Deploy, Manage deployments, Edit, New version) and that this device is online.");
+    }
+    $("setupBtn").disabled = false;
+  }
+
+  function onJoinForm(ev) {
+    ev.preventDefault();
+    const code = normCode($("joinCode").value);
+    if (!CODE_RE.test(code)) { setMsg("joinMsg", "A room code is six characters: letters and the numbers 2 to 9. It never has the letters I or O, or the numbers 0 or 1."); return; }
+    setMsg("joinMsg", "");
+    me.code = code;
+    enterGuest();
+  }
+
+  /* ---------- the microphone ---------- */
+
+  async function micStart() {
+    mic.want = true;
+    if (mic.state === "asking" || mic.state === "on") return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { mic.state = "none"; paint(); return; }
+    mic.state = "asking"; paint();
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+      const t = s.getAudioTracks()[0];
+      if (!mic.want || !t) { if (t) t.stop(); mic.state = "off"; paint(); return; }     // switched off again while the browser was asking
+      mic.track = t; mic.state = "on";
+      t.addEventListener("ended", () => { if (mic.track === t) { mic.track = null; mic.state = "off"; feedAll(); tellMic(); paint(); } });
+    } catch (e) {
+      const n = e && e.name;
+      mic.state = n === "NotAllowedError" || n === "SecurityError" ? "blocked" : (n === "NotFoundError" || n === "OverconstrainedError" ? "none" : "failed");
+    }
+    feedAll(); tellMic(); paint();
+  }
+
+  function micStop() {
+    mic.want = false;
+    if (mic.track) { const t = mic.track; mic.track = null; t.stop(); }
+    if (mic.state !== "asking") mic.state = "off";
+    meterStop(); feedAll(); tellMic(); paint();
+  }
+
+  function micToggle() {
+    if (mic.state === "on" || mic.state === "asking") { micStop(); return; }
+    micStart().then(() => {
+      if (mic.state === "blocked") toast("The microphone is blocked for this page. Allow it in the browser's site settings, then press Mic again.");
+      else if (mic.state === "none") toast("No microphone was found on this device.");
+      else if (mic.state === "failed") toast("The microphone could not start. Another app may be using it.");
+    });
+  }
+
+  function micWords() {
+    return { off: "Your microphone is off.", asking: "Waiting for the browser to allow the microphone...", on: "Your microphone is on.",
+      blocked: "The microphone is blocked for this page. Allow it in the browser's site settings (the icon beside the address), then turn it on here.",
+      none: "No microphone was found on this device.", failed: "The microphone could not start. Another app may be using it." }[mic.state];
+  }
+
+  /* a small level bar, so you can see your own microphone working before anyone joins */
+  const meter = { ctx: null, src: null, node: null, buf: null, raf: 0, track: null };
+  function meterStart() {
+    if (meter.raf || !mic.track) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      meter.ctx = meter.ctx || new Ctx();
+      meter.ctx.resume();
+      meter.track = mic.track;
+      meter.src = meter.ctx.createMediaStreamSource(new MediaStream([mic.track]));
+      meter.node = meter.ctx.createAnalyser(); meter.node.fftSize = 512;
+      meter.buf = new Uint8Array(meter.node.fftSize);
+      meter.src.connect(meter.node);
+      const step = () => {
+        if (!ui.drawer || meter.track !== mic.track) { meterStop(); return; }
+        meter.node.getByteTimeDomainData(meter.buf);
+        let peak = 0;
+        for (let i = 0; i < meter.buf.length; i++) peak = Math.max(peak, Math.abs(meter.buf[i] - 128));
+        $("meterBar").style.width = Math.min(100, Math.round(peak / 128 * 260)) + "%";
+        meter.raf = requestAnimationFrame(step);
+      };
+      meter.raf = requestAnimationFrame(step);
+    } catch (e) { meterStop(); }
+  }
+  function meterStop() {
+    cancelAnimationFrame(meter.raf); meter.raf = 0;
+    try { if (meter.src) meter.src.disconnect(); } catch (e) { /* already gone */ }
+    meter.src = null; meter.track = null;
+    $("meterBar").style.width = "0";
+  }
+
+  /* ---------- the film, on the host's side ---------- */
+
+  function chooseFile(file) {
+    if (!file || me.role !== "host") return;
+    const v = film.el;
+    film.error = ""; film.silent = false; film.file = null; film.next = file; film.a = film.v = null;
+    film.old = new Set(film.cap ? film.cap.getTracks() : []);       // what the capture holds from the film before
+    feedAll();
+    if (film.url) URL.revokeObjectURL(film.url);
+    film.url = URL.createObjectURL(file);
+    v.src = film.url;
+    v.load();
+    paint(); pushState();
+  }
+
+  function onFilmReady() {
+    if (me.role !== "host" || !film.next) return;
+    const v = film.el;
+    if (!v.videoWidth) { failFilm("That file has no picture this browser can play."); return; }
+    film.file = film.next; film.next = null;
+    film.w = v.videoWidth; film.h = v.videoHeight;
+    film.title = (film.fresh && me.film) || tidyName(film.file.name);
+    film.fresh = false;
+    capture();
+    const mine = film.file;
+    setTimeout(() => { if (film.file === mine && !film.a) { film.silent = true; paint(); pushState(); } }, 1500);
+    paint(); pushState();
+  }
+
+  function failFilm(text) {
+    const v = film.el;
+    film.error = text; film.file = null; film.next = null; film.a = film.v = null;
+    feedAll();
+    v.removeAttribute("src"); v.load();
+    paint(); pushState();
+  }
+
+  /* The browser hands over what the player is showing and playing as live tracks. Those are what gets sent.
+     This is asked for once only. When another film is chosen, Chrome adds that film's tracks to the same capture
+     and leaves the old ones in it, still marked live but carrying nothing. So the tracks to send are the ones
+     that were not there before the new film was opened. (Asking for a second capture instead does not work:
+     Chrome gives the player's sound to only one capture at a time, and the other goes out silent.) */
+  function capture() {
+    if (!film.cap) {
+      let s = null;
+      try { s = film.el.captureStream(); } catch (e) { s = null; }
+      if (!s) { failFilm("This browser cannot send that film."); return; }
+      film.cap = s;
+      s.addEventListener("addtrack", syncCapture);
+      s.addEventListener("removetrack", syncCapture);
+    }
+    syncCapture();
+  }
+  function syncCapture() {
+    if (!film.cap) return;
+    const fresh = (t) => isLive(t) && !film.old.has(t);
+    const a = film.file ? film.cap.getAudioTracks().filter(fresh).pop() || null : null;
+    const v = film.file ? film.cap.getVideoTracks().filter(fresh).pop() || null : null;
+    if (a === film.a && v === film.v) return;
+    film.a = a; film.v = v;
+    if (a) film.silent = false;
+    feedAll(); qualityAll(); paint();
+  }
+
+  function setQuality(q, by) {
+    if (!isQuality(q) || q === film.quality) return;
+    film.quality = q;
+    qualityAll();
+    if (by && by !== me.id) toast(Name(by) + " set the picture to " + QUALITY[q].label.toLowerCase());
+    film.last = { by: by || me.id, act: "q" };
+    pushState(); paint();
+  }
+  function qualityAll() { hostLinks().forEach(quality); }
+  function quality(c) {
+    const q = QUALITY[film.quality];
+    try {
+      const p = c.fv.sender.getParameters();
+      if (!p.encodings || !p.encodings.length) return;
+      p.encodings[0].maxBitrate = q.bits;
+      p.encodings[0].scaleResolutionDownBy = Math.max(1, (film.h || q.height) / q.height);
+      c.fv.sender.setParameters(p).catch(() => {});
+    } catch (e) { /* the browser's own limits are used */ }
+  }
+
+  /* ---------- a connection, either side ---------- */
+
+  function rtcConfig() {
+    const ice = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+    if (me.relay) ice.push({ urls: me.relay.url, username: me.relay.user, credential: me.relay.pass });
+    return { iceServers: ice, bundlePolicy: "max-bundle" };
+  }
+
+  /** Waits until the browser has listed the ways it can be reached, but not for ever. */
+  function gathered(pc) {
+    return new Promise((done) => {
+      if (pc.iceGatheringState === "complete") { done(); return; }
+      const cap = setTimeout(finish, me.relay ? 5000 : 3200);
+      function finish() { clearTimeout(cap); pc.removeEventListener("icegatheringstatechange", check); done(); }
+      function check() { if (pc.iceGatheringState === "complete") finish(); }
+      pc.addEventListener("icegatheringstatechange", check);
+    });
+  }
+
+  /* The film's sound is the second sound line. It is asked for in stereo and at a higher quality than a voice call uses.
+     On the host's side the picture is also told to start at a fair quality: left alone it starts very small
+     and takes a quarter of a minute to sharpen. */
+  function tune(sdp, startKbps) {
+    let seen = 0;
+    return String(sdp).split(/\r\n(?=m=)/).map((part) => {
+      if (startKbps && /^m=video /.test(part)) {
+        return part.replace(/a=rtpmap:(\d+) (H264|VP8|VP9|AV1)\/90000[^\r\n]*/gi, (line, pt) => {
+          const have = new RegExp("a=fmtp:" + pt + " [^\\r\\n]*");
+          return have.test(part) ? line : line + "\r\na=fmtp:" + pt + " x-google-start-bitrate=" + startKbps;
+        }).replace(/a=fmtp:(\d+) (?!apt=)([^\r\n]*)/g, (line) => (/x-google-start-bitrate/.test(line) ? line : line + ";x-google-start-bitrate=" + startKbps));
+      }
+      if (!/^m=audio /.test(part) || ++seen !== 2) return part;
+      const m = part.match(/a=rtpmap:(\d+) opus\/48000\/2/i);
+      if (!m) return part;
+      const want = ["stereo=1", "sprop-stereo=1", "maxaveragebitrate=160000"];
+      const line = new RegExp("a=fmtp:" + m[1] + " ([^\\r\\n]*)");
+      if (!line.test(part)) return part.replace(m[0], m[0] + "\r\na=fmtp:" + m[1] + " " + want.join(";"));
+      return part.replace(line, (all, have) => "a=fmtp:" + m[1] + " " + have.split(";").filter((kv) => kv.trim() && !/^(stereo|sprop-stereo|maxaveragebitrate)=/.test(kv.trim())).concat(want).join(";"));
+    }).join("\r\n");
+  }
+
+  /* H.264 is asked for first because phones decode it with a dedicated chip, which saves their battery. */
+  function preferH264(tr) {
+    try {
+      const caps = (window.RTCRtpReceiver && RTCRtpReceiver.getCapabilities && RTCRtpReceiver.getCapabilities("video")) || null;
+      if (!caps || !tr.setCodecPreferences) return;
+      const first = caps.codecs.filter((c) => /\/h264$/i.test(c.mimeType)), rest = caps.codecs.filter((c) => !/\/h264$/i.test(c.mimeType));
+      if (first.length) tr.setCodecPreferences(first.concat(rest));
+    } catch (e) { /* the browser's own order is used */ }
+  }
+
+  function swap(sender, track) { if (sender && sender.track !== (track || null)) sender.replaceTrack(track || null).catch(() => {}); }
+  function sendOn(c, msg) { try { if (c && c.alive && c.dc && c.dc.readyState === "open") c.dc.send(JSON.stringify(msg)); } catch (e) { /* the link is going away */ } }
+  function drop(c) {
+    if (!c || !c.alive) return;
+    c.alive = false;
+    clearTimeout(c.timer); clearTimeout(c.blip);
+    try { if (c.dc) c.dc.close(); } catch (e) { /* closed already */ }
+    try { c.pc.close(); } catch (e) { /* closed already */ }
+  }
+  function hostLinks() { return [host.pending, host.trying, host.active].filter((c) => c && c.alive); }
+  function feedAll() {
+    hostLinks().forEach(feed);
+    if (guest.link && guest.link.alive && guest.link.voice) swap(guest.link.voice.sender, mic.track);
+  }
+  function feed(c) { swap(c.fa.sender, film.a); swap(c.fv.sender, film.v); swap(c.voice.sender, mic.track); }
+  function activeLink() { return me.role === "host" ? host.active : (guest.link && guest.link.state === "active" ? guest.link : null); }
+  function tellMic() { sendOn(activeLink(), { t: "mic", on: mic.state === "on" }); }
+  /* Puts tracks into a stream a player already holds, then hands the stream to the player again. The second
+     step matters: Safari's engine does not show a picture track that was added after the stream was attached. */
+  function carry(stream, tracks, el) {
+    stream.getTracks().forEach((t) => stream.removeTrack(t));
+    tracks.forEach((t) => { if (t) stream.addTrack(t); });
+    if (el && el.srcObject === stream) { el.srcObject = null; el.srcObject = stream; }
+  }
+
+  /* ---------- hosting ---------- */
+
+  function enterHost() {
+    if (!canHost() || !me.idSet) return;
+    me.role = "host";
+    const kept = store("session", KEEP.code);
+    me.code = CODE_RE.test(kept) ? kept : newCode();
+    store("session", KEEP.code, me.code);
+    ui.lobby = true;
+    host.open = true;
+    show("stage");
+    micStart();
+    keepAwake();
+    hostLoop();
+  }
+
+  function hostLink() {
+    const pc = new RTCPeerConnection(rtcConfig());
+    const c = { pc: pc, round: newRound(), title: film.title, dc: null, voice: null, fa: null, fv: null, state: "new", born: Date.now(), timer: 0, blip: 0, alive: true };
+    c.dc = pc.createDataChannel("room", { ordered: true });
+    c.voice = pc.addTransceiver("audio", { direction: "sendrecv" });
+    c.fa = pc.addTransceiver("audio", { direction: "sendonly", streams: [film.tag] });     // the same tag on both keeps picture and sound in step
+    c.fv = pc.addTransceiver("video", { direction: "sendonly", streams: [film.tag] });
+    preferH264(c.fv);
+    feed(c);
+    c.dc.addEventListener("open", () => hostCheck(c));
+    c.dc.addEventListener("close", () => hostLost(c, ""));
+    c.dc.addEventListener("message", (ev) => onMessage(c, ev.data));
+    pc.addEventListener("connectionstatechange", () => hostCheck(c));
+    return c;
+  }
+
+  /** Leaves a fresh note for the other person's browser to answer. */
+  async function publish() {
+    const c = hostLink();
+    try {
+      await c.pc.setLocalDescription(await c.pc.createOffer());
+      await gathered(c.pc);
+      if (!host.open) { drop(c); return; }
+      await api("open", { code: me.code, offer: c.pc.localDescription.sdp, round: c.round, title: c.title, host: me.id });
+    } catch (e) { drop(c); throw e; }
+    if (!host.open) { drop(c); return; }
+    c.state = "offered";
+    host.pending = c;
+    feed(c);                  // a film or microphone that arrived while the note was being written
+  }
+
+  async function accept(sdp) {
+    const c = host.pending;
+    host.pending = null;
+    try { await c.pc.setRemoteDescription({ type: "answer", sdp: tune(sdp, Math.min(START_KBPS, Math.round(QUALITY[film.quality].bits / 1000))) }); }
+    catch (e) {
+      try { await c.pc.setRemoteDescription({ type: "answer", sdp: sdp }); } catch (e2) { drop(c); return; }
+    }
+    if (host.trying) drop(host.trying);
+    host.trying = c; c.state = "trying";
+    if (!host.active) peer.mic = false;
+    c.timer = setTimeout(() => { if (c.state === "trying") { drop(c); if (host.trying === c) host.trying = null; paint(); } }, 20000);
+    hostCheck(c);
+  }
+
+  function hostCheck(c) {
+    if (!c.alive) return;
+    const st = c.pc.connectionState;
+    if (c.state === "trying" && st === "connected" && c.dc.readyState === "open") promote(c);
+    else if (st === "failed" || st === "closed") hostLost(c, "");
+    else if (c.state === "active" && st === "disconnected") {
+      clearTimeout(c.blip);
+      c.blip = setTimeout(() => { if (c.alive && c.pc.connectionState !== "connected") hostLost(c, ""); }, 6000);
+    } else if (c.state === "active" && st === "connected") clearTimeout(c.blip);
+    paint();
+  }
+
+  function promote(c) {
+    clearTimeout(c.timer);
+    c.state = "active";
+    if (host.trying === c) host.trying = null;
+    const old = host.active;
+    host.active = c;
+    if (old) { sendOn(old, { t: "bye", moved: true }); drop(old); }
+    host.gone = "";
+    feed(c);
+    const a = $("voice");
+    carry(live.voice, [c.voice.receiver.track], a);
+    if (a.srcObject !== live.voice) a.srcObject = live.voice;
+    a.play().catch(() => {});
+    quality(c);
+    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on" });
+    pushState();
+    if (film.file && ui.lobby) ui.lobby = false;
+    toast(Name(otherId()) + " joined");
+    say(Name(otherId()) + " joined the room.");
+    paint();
+  }
+
+  function hostLost(c, why) {
+    if (!c.alive) return;
+    const wasActive = host.active === c;
+    drop(c);
+    if (host.trying === c) host.trying = null;
+    if (host.pending === c) host.pending = null;
+    if (wasActive) {
+      host.active = null; peer.mic = false;
+      carry(live.voice, []);
+      host.lastPoll = 0;
+      const playing = film.file && !film.el.paused;
+      if (playing) { film.last = { by: "", act: "" }; film.el.pause(); }
+      host.gone = why === "left" ? Name(otherId()) + " left the room." : Name(otherId()) + "'s connection dropped.";
+      toast(host.gone + (playing ? " Paused." : ""));
+      say(host.gone);
+    }
+    paint();
+  }
+
+  /* While the room is open there is always one unanswered note waiting, so the other person can join or rejoin.
+     It is checked often while nobody is connected and only now and then while somebody is. */
+  async function hostLoop() {
+    if (host.loop) return;
+    host.loop = true;
+    while (host.open) {
+      try {
+        if (!host.pending && !host.trying) { await publish(); host.fails = 0; }
+        const linked = !!(host.active && host.active.pc.connectionState === "connected");
+        const every = linked ? 15000 : 1800;
+        if (host.open && host.pending && Date.now() - host.lastPoll >= every) {
+          host.lastPoll = Date.now();
+          const r = await api("wait", { code: me.code, round: host.pending.round });
+          host.fails = 0;                 // only an answer from Google's side clears the count of failures
+          if (host.open && host.pending) {
+            const c = host.pending;
+            /* A note is replaced when Google has dropped it or when it is over eight minutes old, and only ever
+               straight after finding it unanswered. When just the film's name has changed, the same note is
+               sent again with the new name, so someone answering it at that moment is not turned away. */
+            if (typeof r.answer === "string") await accept(r.answer);
+            else if (r.open === false || Date.now() - c.born > 8 * 60000) { drop(c); host.pending = null; }
+            else if (c.title !== film.title) {
+              const title = film.title;
+              await api("open", { code: me.code, offer: c.pc.localDescription.sdp, round: c.round, title: title, host: me.id });
+              c.title = title;
+            }
+          }
+        }
+      } catch (e) { host.fails += 1; }
+      paint();
+      await sleep(host.fails ? Math.min(8000, 1200 * host.fails) : 500);
+    }
+    host.loop = false;
+  }
+
+  function closeRoom() {
+    if (!host.open) return;
+    host.open = false;
+    sendOn(host.active, { t: "bye", closed: true });
+    const code = me.code;
+    setTimeout(() => { hostLinks().forEach(drop); host.pending = host.trying = host.active = null; }, 150);   // lets the goodbye leave first
+    api("close", { code: code }).catch(() => {});
+    store("session", KEEP.code, null);
+    film.el.pause();
+    micStop();
+    finish("You closed the room.");
+  }
+
+  /* ---------- joining ---------- */
+
+  function enterGuest() {
+    me.role = "guest";
+    guest.want = false; guest.found = null; guest.ended = "";
+    show("stage");
+    peek();
+  }
+
+  function noteHost(r) {
+    guest.hostId = r.host === "b" ? "b" : "a";
+    guest.title = label(r.title, 160);
+    if (!me.idSet || me.id === guest.hostId) me.id = guest.hostId === "a" ? "b" : "a";       // the guest is whoever the host is not
+  }
+
+  /** Looks once, before joining, so the door can say who is hosting and what. */
+  async function peek() {
+    try {
+      const r = await api("look", { code: me.code });
+      me.reach = "ok";
+      guest.found = !r.none;
+      if (!r.none) noteHost(r);
+    } catch (e) { me.reach = "down"; }
+    paint();
+  }
+
+  function join() {
+    if (guest.want) return;
+    guest.want = true; guest.since = Date.now();
+    unlock();                 // has to happen inside the tap, or phones will not play the sound later
+    micStart();
+    keepAwake();
+    guestLoop();
+    paint();
+  }
+
+  function unlock() {
+    const v = film.el, a = $("voice");
+    if (v.srcObject !== live.film) v.srcObject = live.film;
+    if (a.srcObject !== live.voice) a.srcObject = live.voice;
+    v.play().catch(() => {});
+    a.play().catch(() => {});
+  }
+
+  function tryPlay() {
+    const v = film.el;
+    $("voice").play().catch(() => {});
+    const p = v.play();
+    if (p && p.then) p.then(() => { ui.needTap = false; paint(); }).catch((e) => { if (e && e.name === "NotAllowedError") { ui.needTap = true; paint(); } });
+  }
+
+  async function answer(r) {
+    if (guest.link) { drop(guest.link); guest.link = null; }
+    const pc = new RTCPeerConnection(rtcConfig());
+    const c = { pc: pc, round: r.round, dc: null, voice: null, fa: null, fv: null, state: "answering", at: Date.now(), timer: 0, blip: 0, alive: true };
+    guest.link = c;
+    peer.mic = false;
+    remote = { has: false, p: true, c: 0, d: 0, at: performance.now(), title: guest.title, q: remote.q, hid: false, sound: true, n: 0 };
+    pc.addEventListener("datachannel", (ev) => {
+      c.dc = ev.channel;
+      c.dc.addEventListener("open", () => guestCheck(c));
+      c.dc.addEventListener("close", () => guestLost(c));
+      c.dc.addEventListener("message", (e) => onMessage(c, e.data));
+      guestCheck(c);
+    });
+    pc.addEventListener("connectionstatechange", () => guestCheck(c));
+    await pc.setRemoteDescription({ type: "offer", sdp: r.offer });
+    const trs = pc.getTransceivers();
+    const sound = trs.filter((t) => t.receiver.track.kind === "audio");
+    c.voice = sound[0]; c.fa = sound[1]; c.fv = trs.find((t) => t.receiver.track.kind === "video");
+    if (!c.voice || !c.fa || !c.fv) throw new Error("That note is not from a Movie Night room.");
+    c.voice.direction = "sendrecv";
+    swap(c.voice.sender, mic.track);
+    [c.fa, c.fv].forEach((t) => { try { t.receiver.jitterBufferTarget = 200; } catch (e) { /* not every browser has this */ } });   // a fifth of a second in hand smooths out a bumpy connection
+    const ans = await pc.createAnswer();
+    try { await pc.setLocalDescription({ type: "answer", sdp: tune(ans.sdp) }); }
+    catch (e) { await pc.setLocalDescription(ans); }
+    await gathered(pc);
+    if (!c.alive || !guest.want) return;
+    await api("answer", { code: me.code, answer: pc.localDescription.sdp, round: c.round });
+    c.state = "trying"; c.at = Date.now();
+  }
+
+  function guestCheck(c) {
+    if (!c.alive) return;
+    const st = c.pc.connectionState;
+    if (c.state === "trying" && st === "connected" && c.dc && c.dc.readyState === "open") guestIn(c);
+    else if (st === "failed" || st === "closed") guestLost(c);
+    else if (c.state === "active" && st === "disconnected") {
+      clearTimeout(c.blip);
+      c.blip = setTimeout(() => { if (c.alive && c.pc.connectionState !== "connected") guestLost(c); }, 6000);
+    } else if (c.state === "active" && st === "connected") clearTimeout(c.blip);
+    paint();
+  }
+
+  function guestIn(c) {
+    c.state = "active";
+    carry(live.film, [c.fa.receiver.track, c.fv.receiver.track], film.el);
+    carry(live.voice, [c.voice.receiver.track], $("voice"));
+    unlock();
+    tryPlay();
+    setTimeout(() => { if (guest.link === c && c.alive && film.el.paused) { ui.needTap = true; paint(); } }, 2500);
+    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on" });
+    toast("You are in the room with " + nameOf(guest.hostId));
+    say("Connected to " + nameOf(guest.hostId) + ".");
+    paint();
+  }
+
+  function guestLost(c) {
+    if (!c.alive) return;
+    const wasActive = c.state === "active";
+    drop(c);
+    if (guest.link === c) guest.link = null;
+    if (wasActive) { peer.mic = false; guest.since = Date.now(); toast("The connection dropped. Trying to get back in."); }
+    paint();
+  }
+
+  /* Keeps looking for the host's note and answers each new one, until connected. After a drop it starts looking again. */
+  async function guestLoop() {
+    if (guest.loop) return;
+    guest.loop = true;
+    while (guest.want) {
+      const c = guest.link;
+      if (c && c.state === "active") { await sleep(700); continue; }
+      try {
+        const r = await api("look", { code: me.code });
+        guest.fails = 0; me.reach = "ok";
+        if (!guest.want) break;
+        if (r.none) { guest.found = false; if (guest.link) { drop(guest.link); guest.link = null; } }
+        else {
+          guest.found = true; noteHost(r);
+          const cur = guest.link;
+          const busy = !!cur && cur.state === "trying" && Date.now() - cur.at < 6000;        // an answer is out and may still connect
+          if (!cur || (cur.round !== r.round && !busy)) await answer(r);
+          else if (cur.round === r.round && cur.state === "trying" && Date.now() - cur.at > 30000) { drop(cur); guest.link = null; }      // no reply to that note: answer it afresh
+        }
+      } catch (e) {
+        guest.fails += 1;
+        if (guest.link && guest.link.state === "answering") { drop(guest.link); guest.link = null; }
+      }
+      paint();
+      await sleep(guest.fails ? Math.min(8000, 1200 * guest.fails) : 2200);
+    }
+    guest.loop = false;
+  }
+
+  function leave() {
+    if (me.role === "host") { closeRoom(); return; }
+    guest.want = false;
+    sendOn(guest.link, { t: "bye" });
+    const c = guest.link; guest.link = null;
+    setTimeout(() => drop(c), 150);
+    micStop();
+    finish("You left the room.");
+  }
+
+  function finish(text) {
+    carry(live.film, []); carry(live.voice, []);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    releaseAwake();
+    $("closedText").textContent = text;
+    $("againBtn").textContent = me.role === "guest" && guest.ended !== "closed" ? "Join again" : "Back to the start";
+    show("closed");
+  }
+
+  /* ---------- messages between the two browsers ---------- */
+
+  function onMessage(c, raw) {
+    let m = null;
+    try { m = JSON.parse(raw); } catch (e) { return; }
+    const mine = me.role === "host" ? (c === host.active || c === host.trying) : c === guest.link;
+    if (!m || typeof m.t !== "string" || !mine || !c.alive) return;
+    if (m.t === "hi" || m.t === "mic") {
+      peer.mic = (m.t === "hi" ? m.mic : m.on) === true;
+      if (m.t === "hi") sendOn(c, { t: "mic", on: mic.state === "on" });
+      paint();
+      return;
+    }
+    if (me.role === "host") {
+      if (m.t === "cmd" && c === host.active) command(m);
+      else if (m.t === "bye") hostLost(c, m.away ? "" : "left");
+      return;
+    }
+    if (m.t === "st") onState(m);
+    else if (m.t === "bye" && m.away) {
+      guestLost(c);
+      toast(Name(guest.hostId) + "'s room page closed. Waiting for it to come back.");
+    } else if (m.t === "bye") {
+      guest.want = false; guest.ended = m.closed ? "closed" : (m.moved ? "moved" : "");
+      drop(c); guest.link = null;
+      micStop();
+      finish(m.closed ? Name(guest.hostId) + " closed the room." : (m.moved ? "This room was opened on another device, so this one has left it." : Name(guest.hostId) + " left the room."));
+    }
+  }
+
+  /** The other person's presses, applied to the host's player. */
+  function command(m) {
+    const v = film.el, by = otherId();
+    if (m.a === "q") { setQuality(m.q, by); return; }
+    if (!film.file) return;
+    if (m.a === "play") { film.last = { by: by, act: "play" }; v.play().catch(() => {}); toast(Name(by) + " pressed play"); }
+    else if (m.a === "pause") { film.last = { by: by, act: "pause" }; v.pause(); toast(Name(by) + " paused"); }
+    else if (m.a === "seek" && typeof m.to === "number" && isFinite(m.to)) {
+      const to = clamp(m.to, 0, isFinite(v.duration) ? v.duration : 0);
+      film.last = { by: by, act: "seek" }; v.currentTime = to;
+      toast(Name(by) + " skipped to " + clock(to, v.duration));
+    }
+  }
+
+  function pushState() {
+    if (me.role !== "host") return;
+    const v = film.el, c = host.active;
+    if (c) {
+      sendOn(c, { t: "st", n: ++film.seq, has: !!film.file, p: v.paused, c: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : 0,
+        title: film.title, q: film.quality, hid: document.hidden, sound: !film.silent, by: film.last.by, act: film.last.act });
+      film.last = { by: "", act: "" };
+    }
+    paintDeck();
+  }
+
+  function onState(m) {
+    const n = Number(m.n) || 0;
+    const news = n > remote.n;
+    remote = { has: m.has === true, p: m.p !== false, c: Number(m.c) || 0, d: Number(m.d) || 0, at: performance.now(), title: label(m.title, 160),
+      q: isQuality(m.q) ? m.q : "high", hid: m.hid === true, sound: m.sound !== false, n: Math.max(n, remote.n) };
+    if (news && m.by && m.by !== me.id && typeof m.act === "string") {
+      const who = Name(m.by);
+      if (m.act === "play") toast(who + " pressed play");
+      else if (m.act === "pause") toast(who + " paused");
+      else if (m.act === "seek") toast(who + " skipped to " + clock(remote.c, remote.d));
+      else if (m.act === "q") toast(who + " set the picture to " + QUALITY[remote.q].label.toLowerCase());
+    }
+    paint();
+  }
+
+  /* ---------- the controls ---------- */
+
+  function timeline() {
+    if (me.role === "host") {
+      const v = film.el;
+      return { has: !!film.file, paused: v.paused, now: v.currentTime || 0, all: isFinite(v.duration) ? v.duration : 0 };
+    }
+    const c = activeLink();
+    if (!c || !remote.has) return { has: false, paused: true, now: 0, all: 0 };
+    const now = remote.p ? remote.c : remote.c + (performance.now() - remote.at) / 1000;
+    return { has: true, paused: remote.p, now: remote.d ? Math.min(remote.d, now) : now, all: remote.d };
+  }
+
+  function act(what, to) {
+    if (me.role === "host") {
+      if (!film.file) return;
+      const v = film.el;
+      film.last = { by: me.id, act: what };
+      if (what === "play") v.play().catch(() => {});
+      else if (what === "pause") v.pause();
+      else if (what === "seek") v.currentTime = clamp(to, 0, isFinite(v.duration) ? v.duration : 0);
+    } else {
+      const c = activeLink();
+      if (!c || !remote.has) return;
+      sendOn(c, { t: "cmd", a: what, to: to });
+      if (what === "seek") { remote.c = clamp(to, 0, remote.d || 0); remote.at = performance.now(); }      // show it at once; the host's word follows
+    }
+    paintDeck();
+  }
+  function playPause() { const t = timeline(); if (t.has) act(t.paused ? "play" : "pause"); }
+  function skip(by) { const t = timeline(); if (t.has) act("seek", clamp(t.now + by, 0, t.all)); }
+
+  function paintDeck() {
+    if (ui.view !== "stage") return;
+    const t = timeline(), seek = $("seek");
+    ["playBtn", "backBtn", "fwdBtn", "seek"].forEach((id) => { $(id).disabled = !t.has; });
+    $("playBtn").classList.toggle("is-playing", t.has && !t.paused);
+    $("playBtn").setAttribute("aria-label", t.has && !t.paused ? "Pause" : "Play");
+    seek.max = String(Math.max(0, Math.floor(t.all)));
+    if (!ui.scrub) { seek.value = String(Math.floor(t.now)); $("tNow").textContent = clock(t.now, t.all); }
+    $("tAll").textContent = clock(t.all, t.all);
+  }
+
+  /** Everything on the room's screen is drawn from what is known, here. */
+  function paint() {
+    if (ui.view !== "stage") return;
+    const hosting = me.role === "host";
+    const linked = !!activeLink();
+    const other = hosting ? otherId() : (guest.hostId || otherId());
+    const stage = $("stage");
+    stage.dataset.role = me.role;
+
+    /* the line at the top */
+    const pill = $("pill");
+    let words = "", tone = "";
+    if (hosting) {
+      /* While the two of you are connected, Google's side is not needed, so trouble reaching it is not news. */
+      if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? "on" : "off"); tone = "is-good"; }
+      else if (host.fails >= 3) { words = "Cannot reach the Movie Night script. Trying again."; tone = "is-bad"; }
+      else if (host.trying) words = Name(other) + " is connecting";
+      else if (host.gone) { words = host.gone + " Waiting."; tone = "is-bad"; }
+      else words = host.pending ? "Waiting for " + nameOf(other) : "Opening the room";
+    } else if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? "on" : "off"); tone = "is-good"; }
+    else if (guest.want) { words = guest.fails >= 3 ? "Cannot reach the room. Trying again." : "Connecting"; tone = guest.fails >= 3 ? "is-bad" : ""; }
+    else words = "Not joined yet";
+    if (!hosting && linked && remote.hid) { words = nameOf(other) + "'s film window is in the background \u00b7 the picture may freeze"; tone = "is-bad"; words = words.charAt(0).toUpperCase() + words.slice(1); }
+    pill.textContent = words; pill.className = "pill " + tone;
+    $("topTitle").textContent = hosting ? (film.file ? film.title : "") : (linked ? remote.title : guest.title);
+
+    /* what sits over the picture */
+    let card = "";
+    if (hosting) { if (ui.lobby) card = "cardLobby"; }
+    else if (!guest.want) card = "cardDoor";
+    else if (!linked || !remote.has) card = "cardWait";
+    else if (ui.needTap) card = "cardTap";
+    ["cardLobby", "cardDoor", "cardWait", "cardTap"].forEach((id) => { $(id).hidden = id !== card; });
+    $("veil").hidden = !card;
+
+    if (card === "cardLobby") {
+      $("lobbyCode").textContent = me.code;
+      $("lobbyFilm").textContent = film.file ? film.title : "Room code";
+      const st = $("lobbyStatus");
+      st.textContent = linked ? Name(other) + " is here." : (host.fails >= 3 ? "Cannot reach your Movie Night script. Trying again." : (host.trying ? Name(other) + " is connecting." : (host.pending ? "The room is open. Waiting for " + nameOf(other) + "." : "Opening the room.")));
+      st.classList.toggle("is-good", linked);
+      $("lobbyText").textContent = linked
+        ? (film.file ? "Go to the film and press play when you are both ready." : "Choose the film to start.")
+        : "Send " + nameOf(other) + " the link. It opens this room on a phone or a computer. Keep this tab open and in front while you wait.";
+      $("shareBtn").hidden = typeof navigator.share !== "function";
+      $("lobbyFile").textContent = film.file ? film.file.name + " \u00b7 " + clock(film.el.duration, film.el.duration) : (film.next ? "Opening the file." : "No film chosen yet.");
+      $("pickBtn").textContent = film.file ? "Choose another" : "Choose a video file";
+      setMsg("lobbyMsg", film.error || (film.silent ? "This file has no sound this browser can play, so it will play without sound. MP4 files with AAC sound are the safest." : ""));
+      $("startBtn").disabled = !film.file;
+    } else if (card === "cardDoor") {
+      const who = guest.hostId ? Name(guest.hostId) : "The other person";
+      $("doorTitle").textContent = guest.found ? who + " is hosting" : "Join the room";
+      $("doorText").textContent = me.reach === "down" ? "This page could not reach the room just now. Check your connection, then press Join."
+        : (guest.found ? (guest.title ? "The film is " + guest.title + ". " : "") + "Press Join to watch along. You can both pause, skip and talk."
+          : (guest.found === false ? "Room " + me.code + " is not open yet. Press Join and you will go in as soon as it opens." : "Looking for room " + me.code + "."));
+    } else if (card === "cardWait") {
+      const who = guest.hostId ? nameOf(guest.hostId) : "the other person";
+      const slow = Date.now() - guest.since > 25000;
+      let title = "Connecting", text = "Reaching " + who + "'s computer.";
+      if (linked) { title = "You are in"; text = who.charAt(0).toUpperCase() + who.slice(1) + " is choosing the film. It will appear here."; }
+      else if (guest.fails >= 3) { title = "No answer"; text = "This page cannot reach the room's meeting point. Check your connection. It keeps trying."; }
+      else if (guest.found === false) { title = "Not open yet"; text = "Room " + me.code + " is not open yet. You will go in as soon as " + who + " opens it."; }
+      else if (slow) text = "This is taking longer than it should. If it never connects, the two internet connections may not allow a direct link. Switching one side between Wi-Fi and mobile data sometimes fixes it.";
+      $("waitTitle").textContent = title; $("waitText").textContent = text;
+    }
+
+    /* the buttons */
+    const mb = $("micBtn");
+    mb.textContent = mic.state === "on" ? "Mic on" : (mic.state === "asking" ? "Mic..." : (mic.state === "blocked" ? "Mic blocked" : "Mic off"));
+    mb.classList.toggle("is-on", mic.state === "on");
+    mb.classList.toggle("is-bad", mic.state === "blocked" || mic.state === "failed");
+    mb.setAttribute("aria-pressed", String(mic.state === "on"));
+    $("fullBtn").hidden = !(stage.requestFullscreen || stage.webkitRequestFullscreen) || document.fullscreenEnabled === false;
+    $("roomBtn").setAttribute("aria-expanded", String(ui.drawer));
+    stage.classList.toggle("is-idle", ui.idle && !card && !ui.drawer && !timeline().paused);
+    stage.classList.toggle("no-deck", !hosting && !guest.want);
+
+    /* the settings */
+    $("drawer").hidden = !ui.drawer;
+    if (ui.drawer) {
+      $("dInvite").hidden = !hosting; $("dFilm").hidden = !hosting;
+      $("dCode").textContent = me.code;
+      $("dMicText").textContent = micWords();
+      $("dMic").textContent = mic.state === "on" || mic.state === "asking" ? "Turn off" : "Turn on";
+      $("meter").hidden = mic.state !== "on";
+      if (mic.state === "on") meterStart();
+      $("dFilmName").textContent = film.error || (film.file ? film.file.name + (film.silent ? " (no sound this browser can play)" : "") : "No film chosen yet.");
+      $("voiceVolLabel").textContent = Name(other) + "'s voice";
+      $("quality").value = hosting ? film.quality : remote.q;
+      $("quality").disabled = !hosting && !linked;
+      $("leaveBtn").textContent = hosting ? "Close the room" : "Leave the room";
+    }
+    paintDeck();
+  }
+
+  function poke() {
+    ui.idle = false;
+    clearTimeout(ui.idleTimer);
+    ui.idleTimer = setTimeout(() => { ui.idle = true; paint(); }, 3400);
+    $("stage").classList.remove("is-idle");
+  }
+
+  function inviteLink() { return location.origin + location.pathname + "#app=" + encodeURIComponent(me.app) + "&code=" + me.code; }
+  async function copyInvite() {
+    const link = inviteLink();
+    try { await navigator.clipboard.writeText(link); toast("Invite link copied"); }
+    catch (e) {
+      const box = document.createElement("textarea");
+      box.value = link; box.setAttribute("readonly", ""); box.style.position = "fixed"; box.style.opacity = "0";
+      document.body.append(box); box.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+      box.remove();
+      toast(ok ? "Invite link copied" : "Could not copy. The room code is " + me.code);
+    }
+  }
+  function shareInvite() {
+    try { navigator.share({ title: "Movie Night", text: "Join me to watch a film: room " + me.code, url: inviteLink() }).catch(() => {}); } catch (e) { copyInvite(); }
+  }
+
+  function toggleFull() {
+    const st = $("stage");
+    if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    const go = st.requestFullscreen || st.webkitRequestFullscreen;
+    if (go) { try { const p = go.call(st); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not allowed here */ } }
+  }
+
+  let awake = null;
+  async function keepAwake() {
+    try { if (navigator.wakeLock && !awake && document.visibilityState === "visible") { awake = await navigator.wakeLock.request("screen"); awake.addEventListener("release", () => { awake = null; }); } } catch (e) { awake = null; }
+  }
+  function releaseAwake() { try { if (awake) awake.release(); } catch (e) { /* gone already */ } awake = null; }
+
+  /* a line of plain facts about the link, for when something needs explaining */
+  const facts = { bytes: 0, at: 0, busy: false };
+  async function paintFacts() {
+    if (!ui.drawer || facts.busy || ui.view !== "stage") return;
+    const c = activeLink();
+    if (!c) { $("details").textContent = "Not connected."; facts.bytes = 0; return; }
+    facts.busy = true;
+    try {
+      const stats = await c.pc.getStats();
+      const by = {}; let pair = null, vid = null;
+      stats.forEach((r) => { by[r.id] = r; });
+      stats.forEach((r) => {
+        if (r.type === "transport" && r.selectedCandidatePairId && by[r.selectedCandidatePairId]) pair = by[r.selectedCandidatePairId];
+        if (r.kind === "video" && (r.type === "outbound-rtp" || r.type === "inbound-rtp")) vid = r;
+      });
+      if (!pair) stats.forEach((r) => { if (r.type === "candidate-pair" && r.nominated && r.state === "succeeded") pair = r; });
+      const parts = [];
+      if (pair) { const l = by[pair.localCandidateId], rm = by[pair.remoteCandidateId]; parts.push((l && l.candidateType === "relay") || (rm && rm.candidateType === "relay") ? "Through a relay" : "Direct link"); }
+      if (vid) {
+        const codec = by[vid.codecId];
+        if (codec && codec.mimeType) parts.push(codec.mimeType.replace(/^video\//i, ""));
+        if (vid.frameWidth) parts.push(vid.frameWidth + "\u00d7" + vid.frameHeight);
+        const bytes = vid.bytesSent || vid.bytesReceived || 0, now = performance.now();
+        if (facts.bytes && now > facts.at && bytes >= facts.bytes) parts.push(((bytes - facts.bytes) * 8 / ((now - facts.at) / 1000) / 1e6).toFixed(1) + " Mbps picture");
+        facts.bytes = bytes; facts.at = now;
+      }
+      $("details").textContent = parts.join(" \u00b7 ") || "Connected.";
+    } catch (e) { /* no facts this time */ }
+    facts.busy = false;
+  }
+
+  /* ---------- wiring ---------- */
+
+  function wire() {
+    film.el = $("film");
+    const v = film.el;
+
+    $("setupForm").addEventListener("submit", onSetup);
+    $("joinForm").addEventListener("submit", onJoinForm);
+    $("who-a").addEventListener("click", () => setMe("a"));
+    $("who-b").addEventListener("click", () => setMe("b"));
+    $("hostBtn").addEventListener("click", enterHost);
+    $("againBtn").addEventListener("click", () => {
+      if (me.role === "guest" && guest.ended !== "closed") { location.reload(); return; }
+      location.hash = "#app=" + encodeURIComponent(me.app) + "&me=" + me.id;
+      location.reload();
+    });
+
+    $("pickBtn").addEventListener("click", () => $("file").click());
+    $("dChoose").addEventListener("click", () => $("file").click());
+    $("file").addEventListener("change", (ev) => { chooseFile(ev.target.files[0]); ev.target.value = ""; });
+    $("copyBtn").addEventListener("click", copyInvite);
+    $("dCopy").addEventListener("click", copyInvite);
+    $("shareBtn").addEventListener("click", shareInvite);
+    $("startBtn").addEventListener("click", () => { ui.lobby = false; poke(); paint(); });
+    $("dLobby").addEventListener("click", () => { ui.lobby = true; ui.drawer = false; paint(); });
+    $("joinBtn").addEventListener("click", join);
+    $("tapBtn").addEventListener("click", () => { ui.needTap = false; unlock(); tryPlay(); paint(); });
+
+    $("playBtn").addEventListener("click", playPause);
+    $("backBtn").addEventListener("click", () => skip(-10));
+    $("fwdBtn").addEventListener("click", () => skip(10));
+    const seek = $("seek");
+    seek.addEventListener("input", () => { ui.scrub = true; $("tNow").textContent = clock(Number(seek.value), Number(seek.max)); });
+    seek.addEventListener("change", () => { ui.scrub = false; act("seek", Number(seek.value)); });
+    $("micBtn").addEventListener("click", micToggle);
+    $("dMic").addEventListener("click", micToggle);
+    $("roomBtn").addEventListener("click", () => { ui.drawer = !ui.drawer; paint(); paintFacts(); });
+    $("drawerClose").addEventListener("click", () => { ui.drawer = false; paint(); $("roomBtn").focus(); });
+    $("fullBtn").addEventListener("click", toggleFull);
+    $("leaveBtn").addEventListener("click", leave);
+
+    const pick = $("quality");
+    Object.keys(QUALITY).forEach((q) => {
+      const o = document.createElement("option");
+      o.value = q; o.textContent = QUALITY[q].label + " (up to " + gbAnHour(QUALITY[q].bits).toFixed(1) + " GB an hour)";
+      pick.append(o);
+    });
+    pick.addEventListener("change", () => {
+      if (me.role === "host") setQuality(pick.value, me.id);
+      else { sendOn(activeLink(), { t: "cmd", a: "q", q: pick.value }); remote.q = pick.value; }
+    });
+    $("filmVol").addEventListener("input", (ev) => { v.volume = Number(ev.target.value) / 100; });
+    $("voiceVol").addEventListener("input", (ev) => { $("voice").volume = Number(ev.target.value) / 100; });
+    /* iPhones set the volume with their side buttons only, so the sliders are left out there */
+    try { const probe = document.createElement("audio"); probe.volume = 0.5; if (probe.volume !== 0.5) $("dVols").hidden = true; } catch (e) { $("dVols").hidden = true; }
+
+    /* the host's player reports every change to the other person */
+    ["play", "pause", "seeked", "ended", "durationchange", "playing", "waiting"].forEach((name) => v.addEventListener(name, () => { pushState(); paint(); }));
+    v.addEventListener("loadedmetadata", onFilmReady);
+    v.addEventListener("error", () => { if (me.role === "host" && (film.next || film.file)) failFilm("This browser cannot play that file. An MP4 file with H.264 picture and AAC sound is the safest kind."); });
+    setInterval(() => { if (ui.view === "stage") { paintDeck(); } }, 250);
+    setInterval(() => { if (host.open) { syncCapture(); feedAll(); pushState(); } if (ui.view === "stage") { paintFacts(); if (me.role === "guest" && guest.want && !activeLink()) paint(); } }, 1000);
+
+    /* dropping a file on the room works too */
+    const stage = $("stage");
+    stage.addEventListener("dragover", (ev) => { if (me.role === "host") ev.preventDefault(); });
+    stage.addEventListener("drop", (ev) => { if (me.role !== "host") return; ev.preventDefault(); const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) chooseFile(f); });
+
+    ["pointermove", "pointerdown", "keydown"].forEach((name) => stage.addEventListener(name, poke, { passive: true }));
+    v.addEventListener("click", () => { if (ui.drawer) { ui.drawer = false; paint(); } });
+    v.addEventListener("dblclick", toggleFull);
+    document.addEventListener("keydown", (ev) => {
+      if (ui.view !== "stage" || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      const tag = ev.target && ev.target.tagName;
+      if (ev.key === "Escape" && ui.drawer) { ui.drawer = false; paint(); $("roomBtn").focus(); return; }
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || !$("veil").hidden) return;
+      if (ev.key === " " && tag === "BUTTON") return;           // the space bar presses the button it is on
+      if (ev.key === " " || ev.key === "k") { ev.preventDefault(); playPause(); }
+      else if (ev.key === "ArrowLeft") { ev.preventDefault(); skip(-10); }
+      else if (ev.key === "ArrowRight") { ev.preventDefault(); skip(10); }
+      else if (ev.key === "f") toggleFull();
+      else if (ev.key === "m") micToggle();
+    });
+    document.addEventListener("fullscreenchange", paint);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") { keepAwake(); if (me.role === "guest" && activeLink()) tryPlay(); }
+      pushState();
+    });
+    window.addEventListener("pagehide", () => { sendOn(activeLink(), { t: "bye", away: true }); });
+    window.addEventListener("beforeunload", (ev) => { if (me.role === "host" && host.open && host.active) { ev.preventDefault(); ev.returnValue = ""; } });
+  }
+
+  async function start() {
+    wire();
+    const p = new URLSearchParams(location.hash.replace(/^#/, ""));
+    me.app = cleanLink(p.get("app")) || cleanLink(store("local", KEEP.app));
+    const who = p.get("me"), kept = store("local", KEEP.me);
+    if (who === "a" || who === "b") { me.id = who; me.idSet = true; store("local", KEEP.me, who); }
+    else if (kept === "a" || kept === "b") { me.id = kept; me.idSet = true; }
+    me.film = label(p.get("film"), 160);
+    const code = normCode(p.get("code"));
+    if (!me.app) { show("setup"); return; }
+    store("local", KEEP.app, me.app);
+    if (CODE_RE.test(code)) { me.code = code; enterGuest(); }
+    else { paintHome(); show("home"); }
+    try { await hello(); } catch (e) { me.reach = "down"; }
+    paintHome(); paint();
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>
