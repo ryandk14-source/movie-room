@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<!-- This page may only talk to Google's Apps Script addresses (the Movie Night script) and load its two fonts. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://script.google.com https://script.googleusercontent.com; media-src blob: mediastream:; img-src data:; worker-src blob:; child-src blob:; base-uri 'none'; form-action 'none'">
+<!-- This page may only talk to Google's Apps Script addresses (the Movie Night script), load its two fonts,
+     and fetch the two files of its noise filter from beside itself. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self' 'wasm-unsafe-eval'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; media-src blob: mediastream:; img-src data:; worker-src blob:; child-src blob:; base-uri 'none'; form-action 'none'">
 <title>Watch together - Movie Night</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23E2472B'/%3E%3Cpath d='M12 9l12 7-12 7z' fill='%23FBEFD5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -142,32 +143,79 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
 .drawer section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .drawer section > * + * { margin-top: 10px; }
 .d-code { font-family: var(--poster-font); font-size: 1.75rem; letter-spacing: .08em; color: var(--butter); }
-.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
-.meter i { display: block; width: 0; height: 100%; background: #7ddc8a; }
+/* the level bar: the lighter stretch is where a speaking voice should reach */
+.meter { position: relative; height: 12px; border-radius: 6px; overflow: hidden; background: linear-gradient(90deg, var(--line) 0 50%, #2f4a35 50% 83.3%, var(--line) 83.3%); }
+.meter i { display: block; width: 0; height: 100%; background: #7ddc8a; transition: width .09s linear; }
+.meter b { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--white); opacity: .85; transition: left .09s linear; }
+.meter.is-hot i { background: var(--butter); }
+.hint { padding: 8px 10px; border-left: 3px solid var(--line); color: var(--ash); font-size: .875rem; }
+.hint.is-bad { border-left-color: var(--butter); background: rgb(255 200 61 / .08); color: var(--white); }
+.drawer label span { color: var(--white); font-weight: 700; }
+#micBtn { position: relative; overflow: hidden; }
+#micBtn i { position: absolute; left: 0; bottom: 0; width: 0; height: 3px; background: #7ddc8a; transition: width .09s linear; }
+
+/* who is talking: one small disc each, lit while that person speaks */
+.people { position: absolute; z-index: 5; right: var(--pad); top: calc(max(12px, env(safe-area-inset-top)) + 46px); display: flex; gap: 8px; pointer-events: none; }
+.who { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border: 1.5px solid rgb(255 255 255 / .35); border-radius: 50%; background: rgb(0 0 0 / .6); font-size: .9375rem; font-weight: 800; transition: opacity .25s, transform .15s, background-color .15s, color .15s; }
+.who.is-talking { border-color: var(--white); background: var(--white); color: var(--black); transform: scale(1.08); animation: ring 1.1s ease-out infinite; }
+.who.is-off { opacity: .5; }
+.who.is-off::after { content: ""; position: absolute; left: 50%; top: 5px; bottom: 5px; width: 1.5px; margin-left: -1px; background: currentColor; transform: rotate(45deg); }
+.stage.is-idle .who:not(.is-talking) { opacity: 0; }
+@keyframes ring { from { box-shadow: 0 0 0 0 rgb(255 255 255 / .55); } to { box-shadow: 0 0 0 12px rgb(255 255 255 / 0); } }
+
+/* reactions: a small tray to pick from, and the picked one floating up over the film on both screens */
+.tray { position: absolute; z-index: 6; right: var(--pad); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 112px); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: min(100% - 32px, 420px); padding: 8px; border: 1.5px solid var(--line); border-radius: 18px; background: var(--panel); }
+.emo { width: 46px; height: 46px; padding: 0; border: 0; border-radius: 12px; background: transparent; font-size: 1.625rem; line-height: 1; cursor: pointer; }
+.emo:active { transform: scale(.88); }
+.flies { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
+.fly { position: absolute; bottom: 16%; left: var(--x, 50%); font-size: clamp(2.25rem, 7vw, 3.5rem); line-height: 1; filter: drop-shadow(0 2px 8px rgb(0 0 0 / .6)); animation: fly 2.4s cubic-bezier(.2, .7, .3, 1) forwards; }
+.fly small { position: absolute; right: -10px; bottom: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--white); color: var(--black); font: 800 .6875rem/20px var(--font); text-align: center; }
+@keyframes fly {
+  0% { transform: translate(-50%, 30px) scale(.4); opacity: 0; }
+  12% { transform: translate(-50%, 0) scale(1.15); opacity: 1; }
+  24% { transform: translate(-50%, -14px) scale(1); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx, 0px)), -42vh) scale(.9); opacity: 0; }
+}
+@keyframes flyStill { 0%, 80% { transform: translate(-50%, 0); opacity: 1; } 100% { transform: translate(-50%, 0); opacity: 0; } }
 .drawer input[type="range"] { display: block; width: 100%; height: 28px; margin: 4px 0 0; accent-color: var(--white); }
 .drawer select { width: 100%; min-height: 44px; margin-top: 6px; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--black); color: var(--white); }
 .toast { position: absolute; z-index: 7; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 9px 16px; border-radius: 999px; background: var(--white); color: var(--black); font-weight: 700; font-size: .9375rem; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.is-up { opacity: 1; }
+.stage.has-tray .toast { bottom: 190px; }
 
 @media (hover: hover) and (pointer: fine) {
   .btn:hover { background: #e4e4e4; border-color: #e4e4e4; }
   .btn-line:hover { background: rgb(255 255 255 / .12); border-color: var(--white); }
   .chip:hover, .round:hover { border-color: var(--white); }
   .link:hover { text-decoration-thickness: 2px; }
+  .emo:hover { background: rgb(255 255 255 / .12); }
 }
 @media (max-width: 560px) {
   .drawer { top: auto; left: 0; width: 100%; max-height: 82%; border-left: 0; border-top: 1.5px solid var(--line); border-radius: 16px 16px 0 0; }
   .round { width: 44px; height: 44px; }
   .round.is-main { width: 52px; height: 52px; }
-  .deck-row { gap: 6px; }
+  /* a narrow screen gets two rows: play and skip above, the rest below */
+  .deck-row { flex-wrap: wrap; gap: 8px 6px; }
+  .deck-gap { flex: 0 0 100%; height: 0; }
   .deck .chip { padding: 5px 11px; }
+  .veil { padding-bottom: 200px; }
+  .toast { bottom: 206px; }
+  .tray { left: var(--pad); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 166px); display: grid; grid-template-columns: repeat(4, 46px); justify-content: center; max-width: none; }
+  .stage.has-tray .toast { bottom: 296px; }
 }
 @media (max-height: 460px) {
   .veil { padding-top: 54px; padding-bottom: 118px; place-items: start center; }
   .deck { padding-top: 30px; }
   .toast { bottom: 110px; }
+  .tray { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 92px); }
+  .stage.has-tray .toast { bottom: 172px; }
 }
-@media (prefers-reduced-motion: reduce) { .top, .deck, .toast { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .top, .deck, .toast, .who, .meter i, .meter b, #micBtn i { transition: none; }
+  .who.is-talking { animation: none; }
+  .fly { animation: flyStill 1.8s linear forwards; }
+}
 </style>
 </head>
 <body data-view="start">
@@ -227,7 +275,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     </details>
   </section>
 
-  <p class="fine" id="versionLine" style="margin-top:34px">Movie Night room, version 5.</p>
+  <p class="fine" id="versionLine" style="margin-top:34px">Movie Night room, version 6.</p>
 
   <section id="closedView" hidden>
     <p class="lead" id="closedText"></p>
@@ -239,6 +287,8 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
   <video id="film" playsinline preload="auto"></video>
   <audio id="voice" autoplay></audio>
   <input type="file" id="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv" hidden>
+  <div class="flies" id="flies" aria-hidden="true"></div>
+  <div class="people" id="people" aria-hidden="true" hidden><span class="who" id="whoMe"></span><span class="who" id="whoPeer"></span></div>
 
   <header class="top" id="top">
     <p class="t-m top-title" id="topTitle"></p>
@@ -262,6 +312,10 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
       <div class="filmline">
         <p id="lobbyFile">No film chosen yet.</p>
         <button type="button" class="btn btn-small btn-line" id="pickBtn">Choose a video file</button>
+      </div>
+      <div class="filmline">
+        <p id="lobbyMic"></p>
+        <button type="button" class="btn btn-small btn-line" id="lobbyMicBtn">Microphone settings</button>
       </div>
       <p class="msg" id="lobbyMsg" hidden></p>
       <p><button type="button" class="btn btn-line" id="startBtn" disabled>Go to the film</button></p>
@@ -296,13 +350,18 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
       </button>
       <button type="button" class="round" id="fwdBtn" aria-label="Forward 10 seconds" disabled>+10</button>
       <span class="deck-gap"></span>
-      <button type="button" class="chip" id="micBtn" aria-pressed="false">Mic off</button>
+      <button type="button" class="round" id="reactBtn" aria-label="Send a reaction" aria-expanded="false" aria-controls="tray">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM8.5 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM7.4 13.5a5 5 0 0 0 9.2 0z"/></svg>
+      </button>
+      <button type="button" class="chip" id="micBtn" aria-pressed="false"><span id="micWord">Mic off</span><i id="micLamp"></i></button>
       <button type="button" class="chip" id="roomBtn" aria-expanded="false" aria-controls="drawer">Room</button>
       <button type="button" class="round" id="fullBtn" aria-label="Full screen">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h6v2H7v4H5zM13 5h6v6h-2V7h-4zM5 13h2v4h4v2H5zM17 13h2v6h-6v-2h4z"/></svg>
       </button>
     </div>
   </footer>
+
+  <div class="tray" id="tray" role="group" aria-label="Reactions" hidden></div>
 
   <aside class="drawer" id="drawer" aria-label="Room settings" hidden>
     <div class="drawer-head"><h2>Room</h2><button type="button" class="x" id="drawerClose" aria-label="Close">&times;</button></div>
@@ -317,8 +376,27 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     <section>
       <p class="label">Your microphone</p>
       <p id="dMicText"></p>
-      <div class="meter" id="meter" hidden><i id="meterBar"></i></div>
-      <p><button type="button" class="btn btn-small btn-line" id="dMic">Turn on</button></p>
+      <div id="micPickRow" hidden>
+        <label for="micPick">Which microphone</label>
+        <select id="micPick"></select>
+      </div>
+      <div class="meter" id="meter" hidden><i id="meterBar"></i><b id="meterPeak"></b></div>
+      <p class="hint" id="micHint" hidden></p>
+      <div id="micTune" hidden>
+        <label for="micGain">Sensitivity: <span id="micGainText">normal</span></label>
+        <input type="range" id="micGain" min="-20" max="20" step="1" value="0">
+        <label for="micNoise" style="margin-top:10px">Background noise removal</label>
+        <select id="micNoise">
+          <option value="off">Off</option>
+          <option value="normal">Normal (the browser's own)</option>
+          <option value="strong">Strong (an extra filter)</option>
+        </select>
+        <p class="fine" id="micNoiseNote" hidden></p>
+      </div>
+      <div class="row">
+        <button type="button" class="btn btn-small btn-line" id="dMic">Turn on</button>
+        <button type="button" class="btn btn-small btn-line" id="micTest" hidden>Test: record 4 seconds</button>
+      </div>
       <p class="fine">Headphones stop the film's sound going back down your microphone as an echo.</p>
     </section>
     <section id="dVols">
@@ -366,7 +444,12 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
   const APP_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[A-Za-z0-9.\-]{1,100}|macros)\/s\/[A-Za-z0-9_\-]{10,200}\/exec$/;
   const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";       // no I, O, 0 or 1: they get misread
-  const KEEP = { app: "movie-room-app", me: "movie-room-me", code: "movie-room-code" };
+  const KEEP = { app: "movie-room-app", me: "movie-room-me", code: "movie-room-code", mic: "movie-room-mic", gain: "movie-room-mic-gain", noise: "movie-room-mic-noise" };
+  const NOISE = { off: "Off", normal: "Normal", strong: "Strong" };
+  /* The strong noise filter is borrowed work: RNNoise (Xiph.Org), built for browsers by Shiguredo and wrapped as an
+     audio worklet by sapphi-red. Its two files sit beside this page; this is the name the worklet goes by. */
+  const NOISE_NODE = "@sapphi-red/web-noise-suppressor/rnnoise";
+  const EMOJI = [["\u{1F602}", "Laughing"], ["\u2764\uFE0F", "Love"], ["\u{1F62E}", "Wow"], ["\u{1F622}", "Sad"], ["\u{1F631}", "Scared"], ["\u{1F44F}", "Clapping"], ["\u{1F525}", "Fire"], ["\u{1F37F}", "Popcorn"]];
   const START_KBPS = 1500;                                      // where the picture's quality starts, before the connection has been measured
   const EXTRA_BITS = 192000;                                    // the film's sound and a voice, on top of the picture
   const QUALITY = {
@@ -406,20 +489,26 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     return label(s, 120) || "The film";
   }
 
-  /* A page in a background tab has its timers slowed right down. A worker's timers are not, so waiting is timed by one.
-     If the worker cannot start, ordinary timers are used. */
+  /* A page in a background tab has its timers slowed right down. A worker's timers are not, so the page keeps time by
+     one: it ticks ten times a second. If the worker cannot start, an ordinary timer ticks instead. */
+  const beat = (() => {
+    const subs = new Set();
+    let worker = null, spare = 0;
+    const fire = () => subs.forEach((f) => { try { f(); } catch (e) { if (!fire.told) { fire.told = true; console.error("Movie Night room, tick:", e); } } });      // one listener's trouble must not stop the rest; it is reported once
+    const plain = () => { worker = null; if (!spare) spare = setInterval(fire, 100); };
+    try {
+      worker = new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},100)"], { type: "text/javascript" })));
+      worker.onmessage = fire;
+      worker.onerror = plain;
+    } catch (e) { plain(); }
+    return { on: (f) => { subs.add(f); }, steady: () => !!worker };
+  })();
   const sleep = (() => {
     const waiting = new Set();
-    let worker = null;
-    function run() { const now = Date.now(); waiting.forEach((w) => { if (now >= w.at) { waiting.delete(w); clearTimeout(w.spare); w.done(); } }); }
-    try {
-      worker = new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},250)"], { type: "text/javascript" })));
-      worker.onmessage = run;
-      worker.onerror = () => { worker = null; };
-    } catch (e) { worker = null; }
+    beat.on(() => { const now = Date.now(); waiting.forEach((w) => { if (now >= w.at) { waiting.delete(w); clearTimeout(w.spare); w.done(); } }); });
     return (ms) => new Promise((done) => {
       const w = { at: Date.now() + ms, done: done, spare: 0 };
-      w.spare = setTimeout(() => { if (waiting.delete(w)) done(); }, ms + (worker ? 1200 : 0));
+      w.spare = setTimeout(() => { if (waiting.delete(w)) done(); }, ms + (beat.steady() ? 1200 : 0));
       waiting.add(w);
     });
   })();
@@ -427,10 +516,16 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
   /* ---------- what this page knows ---------- */
 
   const me = { role: "", id: "a", idSet: false, code: "", app: "", film: "", names: { a: "", b: "" }, relay: null, reach: "" };
-  const peer = { mic: false };
-  const ui = { view: "start", lobby: true, drawer: false, idle: false, scrub: false, needTap: false, idleTimer: 0, toastTimer: 0 };
+  const peer = { mic: false, quiet: false };
+  const ui = { view: "start", lobby: true, drawer: false, idle: false, scrub: false, needTap: false, idleTimer: 0, toastTimer: 0,
+    tray: false, trayTimer: 0, sent: [], talkMe: false, talkPeer: false, quiet: false, card: "" };
   const film = { el: null, tag: new MediaStream(), cap: null, old: new Set(), a: null, v: null, file: null, next: null, url: "", title: "", w: 0, h: 0, quality: "high", seq: 0, last: { by: "", act: "" }, error: "", silent: false, fresh: true };
-  const mic = { track: null, state: "off", want: false };       // off | asking | on | blocked | none | failed
+  /* The microphone. "raw" is the track straight from the device; "track" is the one that is sent, which is the same
+     one unless the sensitivity or the strong noise filter is in use. state: off | asking | on | blocked | none | failed */
+  const mic = { raw: null, track: null, state: "off", want: false, busy: false, id: "", now: "", label: "", list: [], gain: 0, noise: "normal", strong: "",
+    dead: false, heard: false, since: 0, db: -100, pk: -100, peak: -100, peakAt: 0, voice: -100, told: false, again: [] };
+  const sound = { ctx: null, src: null, tap: null, buf: null, hp: null, gain: null, soft: null, out: null, rn: null, wasm: null, mod: false };
+  const test = { state: "", rec: null, el: null, url: "", timer: 0, left: 0 };
   const live = { film: new MediaStream(), voice: new MediaStream() };
   const host = { open: false, pending: null, trying: null, active: null, lastPoll: 0, fails: 0, loop: false, gone: "" };
   const guest = { want: false, link: null, loop: false, fails: 0, found: null, hostId: "", title: "", since: 0, ended: "" };
@@ -561,32 +656,165 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
 
   /* ---------- the microphone ---------- */
 
+  const fromDb = (db) => Math.pow(10, db / 20);
+  const toDb = (x) => (x > 0 ? Math.max(-100, 20 * Math.log10(x)) : -100);
+  /** What a device calls itself, without the prefixes and code numbers browsers add. */
+  function micName(v) { return label(String(v || "").replace(/^(Default|Communications)\s+-\s+/i, "").replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, ""), 60); }
+
+  /* The page's sound workshop: it measures the microphone, and treats it when asked to. It has to be opened inside
+     a click or a tap, because browsers start it asleep otherwise. Without it the microphone still works; only the
+     level bar, the talking discs, the sensitivity and the strong filter are missing. */
+  function soundCtx() {
+    if (!sound.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      try { sound.ctx = new Ctx({ sampleRate: 48000, latencyHint: "interactive" }); }
+      catch (e) { try { sound.ctx = new Ctx(); } catch (e2) { sound.ctx = null; return null; } }
+      sound.ctx.addEventListener("statechange", () => { micRoute(); paint(); });
+    }
+    if (sound.ctx.state !== "running" && sound.ctx.state !== "closed") {
+      try { const p = sound.ctx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* it stays asleep */ }
+    }
+    return sound.ctx;
+  }
+  const soundOn = () => !!sound.ctx && sound.ctx.state === "running" && !!sound.src && !!sound.tap;
+
+  /* The parts, made once. Untreated, the microphone only passes a meter ("tap") and its own track is sent.
+     Treated, it goes: low rumble cut, the strong filter if chosen, sensitivity, a soft ceiling, and out as a new
+     track, with "tap" measuring what is sent. The soft ceiling is a curve that leaves ordinary levels untouched and
+     rounds off anything a raised sensitivity would otherwise clip. It is drawn for inputs up to four times full
+     scale, which is why the sensitivity is applied at a quarter and the curve gives the level back. */
+  function chainBuild() {
+    const c = sound.ctx;
+    if (!c || sound.tap) return;
+    sound.tap = c.createAnalyser(); sound.tap.fftSize = 1024;
+    sound.buf = new Float32Array(1024);
+    sound.hp = c.createBiquadFilter(); sound.hp.type = "highpass"; sound.hp.frequency.value = 90;
+    sound.gain = c.createGain();
+    sound.soft = c.createWaveShaper();
+    const n = 4097, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1) * 2 - 1) * 4, a = Math.abs(x);
+      curve[i] = a <= 0.6 ? x : Math.sign(x) * (0.6 + 0.35 * Math.tanh((a - 0.6) / 0.35));
+    }
+    sound.soft.curve = curve;
+    sound.out = c.createMediaStreamDestination();
+    try { sound.out.channelCount = 1; sound.out.channelCountMode = "explicit"; } catch (e) { /* two channels carry a voice just as well */ }
+    sound.gain.connect(sound.soft);
+    sound.soft.connect(sound.out);
+    sound.soft.connect(sound.tap);
+  }
+
+  const micStrongOn = () => mic.noise === "strong" && mic.strong === "on" && !!sound.rn;
+  const micTreated = () => soundOn() && mic.state === "on" && !!sound.out && (mic.gain !== 0 || micStrongOn());
+
+  function chainWire() {
+    if (!sound.src || !sound.tap) return;
+    [sound.src, sound.hp, sound.rn].forEach((node) => { try { if (node) node.disconnect(); } catch (e) { /* it was not connected */ } });
+    if (!micTreated()) { sound.src.connect(sound.tap); return; }
+    sound.src.connect(sound.hp);
+    if (micStrongOn()) { sound.hp.connect(sound.rn); sound.rn.connect(sound.gain); } else sound.hp.connect(sound.gain);
+    sound.gain.gain.value = fromDb(mic.gain) * 0.25;
+  }
+
+  /** Decides which track is sent, and hands it to whoever is connected. */
+  function micRoute() {
+    chainWire();
+    let use = null;
+    if (mic.state === "on" && mic.raw) use = (micTreated() && sound.out.stream.getAudioTracks()[0]) || mic.raw;
+    if (mic.track !== use) { mic.track = use; feedAll(); }
+  }
+
+  async function micOpen() {
+    const want = { echoCancellation: true, noiseSuppression: mic.noise !== "off", autoGainControl: true };
+    let s = null;
+    if (mic.id) {
+      try { s = await navigator.mediaDevices.getUserMedia({ audio: Object.assign({ deviceId: { exact: mic.id } }, want), video: false }); }
+      catch (e) { if (!e || (e.name !== "OverconstrainedError" && e.name !== "NotFoundError")) throw e; }     // the chosen one is unplugged: the browser's own choice is used
+    }
+    if (!s) s = await navigator.mediaDevices.getUserMedia({ audio: want, video: false });
+    return s.getAudioTracks()[0] || null;
+  }
+
+  function micTake(t) {
+    mic.raw = t; mic.label = micName(t.label); mic.dead = t.muted === true; mic.heard = false; mic.since = Date.now();
+    mic.db = mic.pk = mic.peak = mic.voice = -100;
+    talk.me = talker();                 // a different microphone has a different background
+    let set = {};
+    try { set = t.getSettings() || {}; } catch (e) { set = {}; }
+    mic.now = typeof set.deviceId === "string" ? set.deviceId : "";
+    t.addEventListener("ended", () => {
+      if (mic.raw !== t) return;
+      micClear(); mic.state = "off"; micRoute(); tellMic(); paint();
+      /* unplugged mid-evening: start again with whatever microphone is left, but not in a loop */
+      const now = Date.now();
+      mic.again = mic.again.filter((at) => now - at < 60000);
+      if (mic.want && mic.again.length < 3) { mic.again.push(now); setTimeout(() => { if (mic.want && mic.state === "off") micStart(); }, 400); }
+    });
+    t.addEventListener("mute", () => { if (mic.raw === t) { mic.dead = true; paint(); } });
+    t.addEventListener("unmute", () => { if (mic.raw === t) { mic.dead = false; mic.since = Date.now(); paint(); } });
+    try { if (sound.src) sound.src.disconnect(); } catch (e) { /* gone already */ }
+    sound.src = null;
+    if (sound.ctx) {
+      chainBuild();
+      try { sound.src = sound.ctx.createMediaStreamSource(new MediaStream([t])); } catch (e) { sound.src = null; }
+    }
+  }
+
+  function micClear() {
+    try { if (sound.src) sound.src.disconnect(); } catch (e) { /* gone already */ }
+    sound.src = null; mic.raw = null; mic.dead = false;
+    mic.db = mic.pk = mic.peak = -100;
+  }
+
   async function micStart() {
     mic.want = true;
     if (mic.state === "asking" || mic.state === "on") return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { mic.state = "none"; paint(); return; }
     mic.state = "asking"; paint();
+    soundCtx();
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
-      const t = s.getAudioTracks()[0];
+      const t = await micOpen();
       if (!mic.want || !t) { if (t) t.stop(); mic.state = "off"; paint(); return; }     // switched off again while the browser was asking
-      mic.track = t; mic.state = "on";
-      t.addEventListener("ended", () => { if (mic.track === t) { mic.track = null; mic.state = "off"; feedAll(); tellMic(); paint(); } });
+      micTake(t); mic.state = "on";
     } catch (e) {
       const n = e && e.name;
       mic.state = n === "NotAllowedError" || n === "SecurityError" ? "blocked" : (n === "NotFoundError" || n === "OverconstrainedError" ? "none" : "failed");
     }
-    feedAll(); tellMic(); paint();
+    micRoute(); tellMic(); paint();
+    if (mic.state === "on") { micList(false); if (mic.noise === "strong") strongLoad(); }
   }
 
   function micStop() {
     mic.want = false;
-    if (mic.track) { const t = mic.track; mic.track = null; t.stop(); }
+    testStop();
+    if (mic.raw) { const t = mic.raw; micClear(); t.stop(); }
     if (mic.state !== "asking") mic.state = "off";
-    meterStop(); feedAll(); tellMic(); paint();
+    micRoute(); tellMic(); paint();
+  }
+
+  /* Opens the microphone afresh: after another one is chosen, or when the browser's own noise removal is switched.
+     The old one is closed first, because phones allow only one to be open at a time. */
+  async function micRestart() {
+    if (mic.state !== "on" || mic.busy) return;
+    mic.busy = true;
+    testStop();
+    const old = mic.raw;
+    micClear();
+    if (old) old.stop();
+    micRoute();
+    let t = null;
+    try { t = await micOpen(); } catch (e) { t = null; }
+    mic.busy = false;
+    if (!mic.want || mic.state !== "on") { if (t) t.stop(); return; }
+    if (!t) { mic.state = "failed"; micRoute(); tellMic(); paint(); toast("The microphone could not start. Another app may be using it."); return; }
+    micTake(t); micRoute(); tellMic(); paint();
+    await micList(false);
+    if (mic.id && mic.now && mic.now !== "default" && mic.now !== mic.id) toast("That microphone is not available. Using " + (mic.label || "another one") + ".");
   }
 
   function micToggle() {
+    soundCtx();
     if (mic.state === "on" || mic.state === "asking") { micStop(); return; }
     micStart().then(() => {
       if (mic.state === "blocked") toast("The microphone is blocked for this page. Allow it in the browser's site settings, then press Mic again.");
@@ -595,41 +823,187 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     });
   }
 
+  /* The microphones this device has. Browsers only name them once one has been allowed. */
+  async function micList(changed) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    let all = [];
+    try { all = await navigator.mediaDevices.enumerateDevices(); } catch (e) { all = []; }
+    const seen = new Set();
+    mic.list = all.filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" && d.label && !seen.has(d.deviceId) && seen.add(d.deviceId))
+      .map((d) => ({ id: d.deviceId, label: micName(d.label) }));
+    /* the one chosen here before has been plugged back in: return to it */
+    if (changed && mic.state === "on" && !mic.busy && mic.id && mic.now && mic.now !== "default" && mic.now !== mic.id && mic.list.some((d) => d.id === mic.id)) { micRestart(); return; }
+    paintMics();
+  }
+
+  function micUse(id) {
+    if (!id || (id === mic.id && id === mic.now)) return;
+    mic.id = id;
+    store("local", KEEP.mic, id);
+    if (mic.state === "on") micRestart();
+  }
+
+  function micSetGain(db, keep) {
+    mic.gain = clamp(Math.round(Number(db) || 0), -20, 20);
+    if (keep) store("local", KEEP.gain, String(mic.gain));
+    micRoute(); paintTune();
+  }
+
+  function micSetNoise(mode) {
+    if (!Object.prototype.hasOwnProperty.call(NOISE, mode) || mode === mic.noise) return;
+    const was = mic.noise;
+    mic.noise = mode;
+    store("local", KEEP.noise, mode);
+    if (mode === "strong") strongLoad();
+    if ((was === "off") !== (mode === "off")) micRestart(); else { micRoute(); paint(); }
+  }
+
+  /* The strong filter is fetched only when it is asked for. If anything about it fails, the normal one carries on. */
+  async function strongLoad() {
+    if (mic.strong === "loading" || mic.strong === "on") return;
+    const c = soundCtx();
+    if (!c || !c.audioWorklet || typeof AudioWorkletNode !== "function" || typeof WebAssembly !== "object" || c.sampleRate !== 48000) { mic.strong = "failed"; paint(); return; }
+    mic.strong = "loading"; paint();
+    try {
+      if (!sound.wasm) {
+        const res = await fetch("rnnoise.wasm", { credentials: "omit" });
+        if (!res.ok) throw new Error("The filter's file is missing.");
+        const bin = await res.arrayBuffer();
+        await WebAssembly.compile(bin);                 // proves this browser will run it under this page's rules
+        sound.wasm = bin;
+      }
+      if (!sound.mod) { await c.audioWorklet.addModule("rnnoise-worklet.js"); sound.mod = true; }
+      chainBuild();
+      const node = new AudioWorkletNode(c, NOISE_NODE, { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: "explicit",
+        processorOptions: { maxChannels: 1, wasmBinary: sound.wasm } });
+      /* The filter loads its inner part by itself and then says "ready". Until it has, nothing is sent through it. */
+      const ready = await new Promise((done) => {
+        const cap = setTimeout(() => done(false), 6000);
+        node.port.onmessage = (ev) => { if (ev.data === "ready" || ev.data === "failed") { clearTimeout(cap); done(ev.data === "ready"); } };
+      });
+      if (!ready) { try { node.port.postMessage("destroy"); } catch (e2) { /* it never started */ } throw new Error("The filter did not start."); }
+      node.addEventListener("processorerror", strongFail);
+      sound.rn = node;
+      mic.strong = "on";
+    } catch (e) { mic.strong = "failed"; }
+    micRoute(); paint();
+  }
+  function strongFail() {
+    try { if (sound.rn) sound.rn.disconnect(); } catch (e) { /* gone already */ }
+    sound.rn = null; mic.strong = "failed";
+    micRoute(); paint();
+    toast("The strong noise filter stopped, so the normal one is in use.");
+  }
+  function read(node, buf) {
+    if (node.getFloatTimeDomainData) { node.getFloatTimeDomainData(buf); return; }
+    const bytes = new Uint8Array(buf.length);
+    node.getByteTimeDomainData(bytes);
+    for (let i = 0; i < bytes.length; i++) buf[i] = (bytes[i] - 128) / 128;
+  }
+
+  /** Measures what is being sent, ten times a second. Gives false when it cannot be measured. */
+  function micLevel(now) {
+    if (mic.state !== "on" || !soundOn()) { mic.db = mic.pk = mic.peak = -100; return false; }
+    const b = sound.buf;
+    read(sound.tap, b);
+    let sum = 0, top = 0;
+    for (let i = 0; i < b.length; i++) { const x = b[i]; sum += x * x; const a = x < 0 ? -x : x; if (a > top) top = a; }
+    mic.db = toDb(Math.sqrt(sum / b.length));
+    mic.pk = toDb(top);
+    if (mic.pk >= mic.peak || now - mic.peakAt > 1500) { mic.peak = mic.pk; mic.peakAt = now; }
+    if (mic.db > -55) mic.heard = true;
+    return true;
+  }
+
+  /* On, but nothing has come from it: muted on the device, or silent since it was opened. The second is only said
+     when this page can measure it. */
+  function micQuiet() { return mic.state === "on" && !!mic.raw && (mic.dead || (soundOn() && !mic.heard && Date.now() - mic.since > 6000)); }
+
+  /* Who is talking. A level counts as talking when it stands clear of the background, and the background is whatever
+     the quiet moments sound like: it is followed down at once and up only slowly, so a steady hum stops counting.
+     While the other person is speaking ("other"), this side's level is not a fair guide to its background: echo
+     cancelling pushes it down, and can let a little of their voice back in. So the background is not lowered then,
+     and more is asked before this side counts as talking. */
+  function talker() { return { floor: -70, hot: 0, last: 0, on: false, loud: 0, stamp: 0, seen: 0 }; }
+  function hear(tk, db, now, other) {
+    if (db >= tk.floor) tk.floor += (Math.min(db, -20) - tk.floor) * 0.02; else if (!other) tk.floor = Math.max(-90, db);
+    const bar = other ? Math.max(-45, tk.floor + 16) : Math.max(-50, tk.floor + 10);
+    if (db > bar) { tk.hot += 1; if (tk.hot >= 2) { tk.on = true; tk.last = now; } } else tk.hot = 0;
+    if (tk.on && now - tk.last > 500) tk.on = false;
+    return tk.on;
+  }
+  const talk = { me: talker(), peer: talker() };
+
+  /** How loud the other person's voice is arriving, as the browser reports it. Null when it does not say. */
+  function peerLevel(now) {
+    const c = activeLink(), tk = talk.peer;
+    if (!c || !c.voice || !c.voice.receiver.getSynchronizationSources) return null;
+    let best = null;
+    try { c.voice.receiver.getSynchronizationSources().forEach((s) => { if (typeof s.audioLevel === "number" && (!best || s.timestamp > best.timestamp)) best = s; }); } catch (e) { return null; }
+    if (!best) return -100;
+    if (best.timestamp !== tk.stamp) { tk.stamp = best.timestamp; tk.seen = now; } else if (now - tk.seen > 600) return -100;      // nothing new has arrived: the last level is stale
+    return toDb(best.audioLevel);
+  }
+
   function micWords() {
     return { off: "Your microphone is off.", asking: "Waiting for the browser to allow the microphone...", on: "Your microphone is on.",
       blocked: "The microphone is blocked for this page. Allow it in the browser's site settings (the icon beside the address), then turn it on here.",
       none: "No microphone was found on this device.", failed: "The microphone could not start. Another app may be using it." }[mic.state];
   }
 
-  /* a small level bar, so you can see your own microphone working before anyone joins */
-  const meter = { ctx: null, src: null, node: null, buf: null, raf: 0, track: null };
-  function meterStart() {
-    if (meter.raf || !mic.track) return;
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      meter.ctx = meter.ctx || new Ctx();
-      meter.ctx.resume();
-      meter.track = mic.track;
-      meter.src = meter.ctx.createMediaStreamSource(new MediaStream([mic.track]));
-      meter.node = meter.ctx.createAnalyser(); meter.node.fftSize = 512;
-      meter.buf = new Uint8Array(meter.node.fftSize);
-      meter.src.connect(meter.node);
-      const step = () => {
-        if (!ui.drawer || meter.track !== mic.track) { meterStop(); return; }
-        meter.node.getByteTimeDomainData(meter.buf);
-        let peak = 0;
-        for (let i = 0; i < meter.buf.length; i++) peak = Math.max(peak, Math.abs(meter.buf[i] - 128));
-        $("meterBar").style.width = Math.min(100, Math.round(peak / 128 * 260)) + "%";
-        meter.raf = requestAnimationFrame(step);
-      };
-      meter.raf = requestAnimationFrame(step);
-    } catch (e) { meterStop(); }
+  /** The line under the level bar: what the bar is showing, in words. The second value marks a warning. */
+  function micHint() {
+    if (mic.state !== "on") return ["", false];
+    if (mic.dead) return ["This microphone is muted on the device itself. On a headset, check the mute button or the microphone arm.", true];
+    if (!soundOn()) return ["", false];
+    if (!mic.heard) {
+      return Date.now() - mic.since > 3000
+        ? ["No sound is coming from this microphone. Say something. If the bar stays flat, " + (mic.list.length > 1 ? "choose another microphone above, or " : "") + "check that it is not muted.", true]
+        : ["Say something to check it.", false];
+    }
+    if (mic.peak > -3) return ["Very loud. Lower the sensitivity a little.", true];
+    if (mic.voice > -99 && mic.voice < -30) return ["Quiet. Raise the sensitivity until your voice reaches the lighter zone.", false];
+    return ["When you speak, the bar should reach the lighter zone.", false];
   }
-  function meterStop() {
-    cancelAnimationFrame(meter.raf); meter.raf = 0;
-    try { if (meter.src) meter.src.disconnect(); } catch (e) { /* already gone */ }
-    meter.src = null; meter.track = null;
-    $("meterBar").style.width = "0";
+
+  /* A recording of your own microphone, played straight back: the surest way to know what the other person hears. */
+  function testStop() {
+    clearInterval(test.timer); test.timer = 0;
+    const rec = test.rec;
+    test.rec = null;
+    try { if (rec && rec.state !== "inactive") rec.stop(); } catch (e) { /* stopped already */ }
+    if (test.el) { try { test.el.pause(); } catch (e) { /* not playing */ } test.el = null; }
+    if (test.url) { URL.revokeObjectURL(test.url); test.url = ""; }
+    test.state = "";
+  }
+  function micTest() {
+    if (test.state === "ready" && test.el) { test.state = "play"; const again = test.el.play(); if (again && again.catch) again.catch(() => { testStop(); paint(); }); paint(); return; }
+    if (test.state) { testStop(); paint(); return; }
+    if (mic.state !== "on" || !mic.track || typeof MediaRecorder !== "function") return;
+    const parts = [];
+    let rec = null;
+    try { rec = new MediaRecorder(new MediaStream([mic.track])); rec.start(); } catch (e) { toast("This browser cannot record a test."); return; }
+    test.rec = rec; test.state = "rec"; test.left = 4;
+    rec.addEventListener("dataavailable", (ev) => { if (ev.data && ev.data.size) parts.push(ev.data); });
+    rec.addEventListener("stop", () => {
+      if (test.state !== "rec" || !parts.length) { if (test.state === "rec") { testStop(); paint(); toast("Nothing was recorded."); } return; }
+      test.rec = null;
+      test.url = URL.createObjectURL(new Blob(parts, { type: rec.mimeType || parts[0].type || "audio/webm" }));
+      const a = new Audio();
+      test.el = a; test.state = "play";
+      a.addEventListener("ended", () => { if (test.el === a) { testStop(); paint(); } });
+      a.addEventListener("error", () => { if (test.el === a) { testStop(); paint(); toast("The recording could not be played here."); } });
+      a.src = test.url;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { if (test.el === a) { test.state = "ready"; paint(); } });       // the browser wants a tap first
+      paint();
+    });
+    test.timer = setInterval(() => {
+      test.left -= 1;
+      if (test.left <= 0) { clearInterval(test.timer); test.timer = 0; try { rec.stop(); } catch (e) { testStop(); } }
+      paint();
+    }, 1000);
+    paint();
   }
 
   /* ---------- the film, on the host's side ---------- */
@@ -783,7 +1157,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
   }
   function feed(c) { swap(c.fa.sender, film.a); swap(c.fv.sender, film.v); swap(c.voice.sender, mic.track); }
   function activeLink() { return me.role === "host" ? host.active : (guest.link && guest.link.state === "active" ? guest.link : null); }
-  function tellMic() { sendOn(activeLink(), { t: "mic", on: mic.state === "on" }); }
+  function tellMic() { mic.told = micQuiet(); sendOn(activeLink(), { t: "mic", on: mic.state === "on", quiet: mic.told }); }
   /* Puts tracks into a stream a player already holds, then hands the stream to the player again. The second
      step matters: Safari's engine does not show a picture track that was added after the stream was attached. */
   function carry(stream, tracks, el) {
@@ -879,7 +1253,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     if (a.srcObject !== live.voice) a.srcObject = live.voice;
     a.play().catch(() => {});
     quality(c);
-    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on" });
+    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on", quiet: micQuiet() });
     pushState();
     if (film.file && ui.lobby) ui.lobby = false;
     toast(Name(otherId()) + " joined");
@@ -1056,7 +1430,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     unlock();
     tryPlay();
     setTimeout(() => { if (guest.link === c && c.alive && film.el.paused) { ui.needTap = true; paint(); } }, 2500);
-    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on" });
+    sendOn(c, { t: "hi", id: me.id, mic: mic.state === "on", quiet: micQuiet() });
     toast("You are in the room with " + nameOf(guest.hostId));
     say("Connected to " + nameOf(guest.hostId) + ".");
     paint();
@@ -1112,6 +1486,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
 
   function finish(text) {
     carry(live.film, []); carry(live.voice, []);
+    $("flies").textContent = ""; ui.tray = false; clearTimeout(ui.trayTimer);
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
     releaseAwake();
     $("closedText").textContent = text;
@@ -1127,11 +1502,15 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     const mine = me.role === "host" ? (c === host.active || c === host.trying) : c === guest.link;
     if (!m || typeof m.t !== "string" || !mine || !c.alive) return;
     if (m.t === "hi" || m.t === "mic") {
+      const was = peer.mic;
       peer.mic = (m.t === "hi" ? m.mic : m.on) === true;
-      if (m.t === "hi") sendOn(c, { t: "mic", on: mic.state === "on" });
+      peer.quiet = peer.mic && m.quiet === true;
+      if (peer.mic && (!was || m.t === "hi")) talk.peer = talker();       // a microphone has just opened: its background is not known yet
+      if (m.t === "hi") sendOn(c, { t: "mic", on: mic.state === "on", quiet: micQuiet() });
       paint();
       return;
     }
+    if (m.t === "re") { if (c === activeLink()) fly(Number(m.e), theOther()); return; }
     if (me.role === "host") {
       if (m.t === "cmd" && c === host.active) command(m);
       else if (m.t === "bye") hostLost(c, m.away ? "" : "left");
@@ -1186,6 +1565,147 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
       else if (m.act === "seek") toast(who + " skipped to " + clock(remote.c, remote.d));
       else if (m.act === "q") toast(who + " set the picture to " + QUALITY[remote.q].label.toLowerCase());
     }
+    paint();
+  }
+
+  /* ---------- the microphone on screen, who is talking, reactions ---------- */
+
+  function initial(id) { const n = me.names[id] || ""; return n ? n.charAt(0).toUpperCase() : (id === me.id ? "Me" : "?"); }
+  function theOther() { return me.role === "host" ? otherId() : (guest.hostId || otherId()); }
+
+  /* Ten times a second: measure the microphone, work out who is talking, and move the level bars. */
+  function pulse() {
+    if (ui.view !== "stage") return;
+    const now = Date.now();
+    const measured = micLevel(now);
+    /* "Muted on the device" is the browser's word for it. It is believed only while no sound is arriving, so a
+       headset that has been unmuted is noticed even if the browser is slow to say so. */
+    const dead = mic.state === "on" && !!mic.raw && mic.raw.muted === true && !(measured && mic.db > -55);
+    if (dead !== mic.dead) { mic.dead = dead; if (!dead) mic.since = now; }
+    const can = measured && !mic.dead;
+    const level = peer.mic && activeLink() ? peerLevel(now) : null;
+    if (can && mic.db > -50) talk.me.loud = now;
+    if (level !== null && level > -50) talk.peer.loud = now;
+    const meTalk = can ? hear(talk.me, mic.db, now, now - talk.peer.loud < 1200) : false;
+    if (meTalk) mic.voice = mic.voice < -99 ? mic.pk : mic.voice + (mic.pk - mic.voice) * 0.15;       // how loud this voice usually peaks
+    const peerTalk = level === null ? false : hear(talk.peer, level, now, now - talk.me.loud < 1200);
+    const quiet = micQuiet();
+    if (quiet !== mic.told) tellMic();
+    if (meTalk !== ui.talkMe || peerTalk !== ui.talkPeer) { ui.talkMe = meTalk; ui.talkPeer = peerTalk; paintPeople(); }
+    if (quiet !== ui.quiet) { ui.quiet = quiet; paint(); }
+    paintLevels();
+  }
+
+  function paintPeople() {
+    const box = $("people");
+    const show = ui.view === "stage" && !ui.card && (me.role === "host" || guest.want);
+    box.hidden = !show;
+    if (!show) return;
+    const a = $("whoMe"), b = $("whoPeer");
+    a.textContent = initial(me.id);
+    a.className = "who" + (mic.state === "on" ? (ui.talkMe ? " is-talking" : "") : " is-off");
+    b.hidden = !activeLink();
+    b.textContent = initial(theOther());
+    b.className = "who" + (peer.mic ? (ui.talkPeer ? " is-talking" : "") : " is-off");
+  }
+
+  const barWidth = (db) => Math.round(clamp((db + 60) / 60, 0, 1) * 1000) / 10 + "%";      // -60 dB is empty, 0 dB is full
+  function paintLevels() {
+    const can = mic.state === "on" && soundOn() && !mic.dead;
+    $("micLamp").style.width = can ? barWidth(mic.pk) : "0";
+    if (!ui.drawer) return;
+    $("meterBar").style.width = can ? barWidth(mic.pk) : "0";
+    $("meterPeak").style.left = can ? barWidth(mic.peak) : "0";
+    $("meter").classList.toggle("is-hot", can && mic.peak > -3);
+    const hint = micHint(), el = $("micHint");
+    if (el.textContent !== hint[0]) el.textContent = hint[0];
+    el.hidden = !hint[0];
+    el.classList.toggle("is-bad", hint[1]);
+  }
+
+  function paintMics() {
+    const pick = $("micPick");
+    const cur = mic.list.find((d) => d.id === mic.now) || mic.list.find((d) => d.label === mic.label) || null;
+    pick.textContent = "";
+    if (!cur && mic.list.length) { const o = document.createElement("option"); o.value = ""; o.textContent = mic.label || "Chosen by the browser"; pick.append(o); }
+    mic.list.forEach((d) => { const o = document.createElement("option"); o.value = d.id; o.textContent = d.label; pick.append(o); });
+    pick.value = cur ? cur.id : "";
+    $("micPickRow").hidden = mic.state !== "on" || mic.list.length < 2;
+  }
+
+  function paintTune() {
+    const on = mic.state === "on", can = on && !!sound.ctx && sound.ctx.state === "running";
+    $("micTune").hidden = !can;
+    if (!can) return;
+    $("micGain").value = String(mic.gain);
+    $("micGainText").textContent = mic.gain === 0 ? "normal" : (mic.gain > 0 ? "+" : "\u2212") + Math.abs(mic.gain) + " dB";
+    $("micNoise").value = mic.noise;
+    const note = mic.noise !== "strong" ? "" : (mic.strong === "loading" ? "Fetching the strong filter..." : (mic.strong === "failed" ? "The strong filter could not start in this browser, so the normal one is in use." : ""));
+    setMsg("micNoiseNote", note);
+  }
+
+  function paintMic() {
+    const quiet = micQuiet(), mb = $("micBtn");
+    $("micWord").textContent = mic.state === "on" ? (quiet ? "Mic: no sound" : "Mic on") : (mic.state === "asking" ? "Mic..." : (mic.state === "blocked" ? "Mic blocked" : "Mic off"));
+    mb.classList.toggle("is-on", mic.state === "on" && !quiet);
+    mb.classList.toggle("is-bad", mic.state === "blocked" || mic.state === "failed" || quiet);
+    mb.setAttribute("aria-pressed", String(mic.state === "on"));
+    if (!ui.drawer) return;
+    const on = mic.state === "on";
+    $("dMicText").textContent = micWords();
+    $("dMic").textContent = on || mic.state === "asking" ? "Turn off" : "Turn on";
+    $("meter").hidden = !on || !soundOn();
+    $("micPickRow").hidden = !on || mic.list.length < 2;
+    const tb = $("micTest");
+    tb.hidden = !on || typeof MediaRecorder !== "function";
+    tb.textContent = test.state === "rec" ? "Recording: speak now (" + Math.max(1, test.left) + ")" : (test.state === "play" ? "Playing it back. Press to stop" : (test.state === "ready" ? "Play the recording" : "Test: record 4 seconds"));
+    paintTune();
+    paintLevels();
+  }
+
+  /** The microphone's state in a sentence, for the host's first card. */
+  function micLine() {
+    if (mic.state !== "on") return micWords();
+    const name = mic.label || "Microphone";
+    if (mic.dead) return name + ": muted on the device itself.";
+    if (!soundOn()) return name + ": on.";
+    return name + (mic.heard ? ": working." : (micQuiet() ? ": no sound from it yet." : ": say something to check it."));
+  }
+
+  function react(i) {
+    if (!Number.isInteger(i) || i < 0 || i >= EMOJI.length || ui.view !== "stage" || ui.card) return;
+    const now = Date.now();
+    ui.sent = ui.sent.filter((at) => now - at < 3000);
+    if (ui.sent.length >= 6) return;                        // six in three seconds is plenty
+    ui.sent.push(now);
+    sendOn(activeLink(), { t: "re", e: i });
+    fly(i, me.id);
+    if (ui.tray) trayHold();
+  }
+
+  /** Floats a reaction up over the film: yours from the left, the other person's from the right. */
+  function fly(i, who) {
+    const box = $("flies");
+    if (!Number.isInteger(i) || i < 0 || i >= EMOJI.length || box.childElementCount >= 14) return;
+    const el = document.createElement("span"), tag = document.createElement("small"), mine = who === me.id;
+    el.className = "fly";
+    el.textContent = EMOJI[i][0];
+    tag.textContent = initial(who);
+    el.append(tag);
+    el.style.setProperty("--x", (mine ? 12 + Math.random() * 20 : 68 + Math.random() * 20).toFixed(1) + "%");
+    el.style.setProperty("--dx", Math.round((Math.random() - 0.5) * 90) + "px");
+    box.append(el);
+    const done = () => el.remove();
+    el.addEventListener("animationend", done);
+    setTimeout(done, 3200);
+    if (!mine) say(Name(who) + " reacted: " + EMOJI[i][1] + ".");
+  }
+
+  function trayHold() { clearTimeout(ui.trayTimer); ui.trayTimer = setTimeout(() => { ui.tray = false; paint(); }, 7000); }
+  function trayToggle() {
+    ui.tray = !ui.tray;
+    clearTimeout(ui.trayTimer);
+    if (ui.tray) trayHold();
     paint();
   }
 
@@ -1246,12 +1766,12 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     let words = "", tone = "";
     if (hosting) {
       /* While the two of you are connected, Google's side is not needed, so trouble reaching it is not news. */
-      if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? "on" : "off"); tone = "is-good"; }
+      if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? (peer.quiet ? "on, no sound yet" : "on") : "off"); tone = "is-good"; }
       else if (host.fails >= 3) { words = "Cannot reach the Movie Night script. Trying again."; tone = "is-bad"; }
       else if (host.trying) words = Name(other) + " is connecting";
       else if (host.gone) { words = host.gone + " Waiting."; tone = "is-bad"; }
       else words = host.pending ? "Waiting for " + nameOf(other) : "Opening the room";
-    } else if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? "on" : "off"); tone = "is-good"; }
+    } else if (linked) { words = Name(other) + " is here \u00b7 mic " + (peer.mic ? (peer.quiet ? "on, no sound yet" : "on") : "off"); tone = "is-good"; }
     else if (guest.want) { words = guest.fails >= 3 ? "Cannot reach the room. Trying again." : "Connecting"; tone = guest.fails >= 3 ? "is-bad" : ""; }
     else words = "Not joined yet";
     if (!hosting && linked && remote.hid) { words = nameOf(other) + "'s film window is in the background \u00b7 the picture may freeze"; tone = "is-bad"; words = words.charAt(0).toUpperCase() + words.slice(1); }
@@ -1266,6 +1786,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     else if (ui.needTap) card = "cardTap";
     ["cardLobby", "cardDoor", "cardWait", "cardTap"].forEach((id) => { $(id).hidden = id !== card; });
     $("veil").hidden = !card;
+    ui.card = card;
 
     if (card === "cardLobby") {
       $("lobbyCode").textContent = me.code;
@@ -1280,6 +1801,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
       $("lobbyFile").textContent = film.file ? film.file.name + " \u00b7 " + clock(film.el.duration, film.el.duration) : (film.next ? "Opening the file." : "No film chosen yet.");
       $("pickBtn").textContent = film.file ? "Choose another" : "Choose a video file";
       setMsg("lobbyMsg", film.error || (film.silent ? "This file has no sound this browser can play, so it will play without sound. MP4 files with AAC sound are the safest." : ""));
+      $("lobbyMic").textContent = micLine();
       $("startBtn").disabled = !film.file;
     } else if (card === "cardDoor") {
       const who = guest.hostId ? Name(guest.hostId) : "The other person";
@@ -1299,14 +1821,13 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     }
 
     /* the buttons */
-    const mb = $("micBtn");
-    mb.textContent = mic.state === "on" ? "Mic on" : (mic.state === "asking" ? "Mic..." : (mic.state === "blocked" ? "Mic blocked" : "Mic off"));
-    mb.classList.toggle("is-on", mic.state === "on");
-    mb.classList.toggle("is-bad", mic.state === "blocked" || mic.state === "failed");
-    mb.setAttribute("aria-pressed", String(mic.state === "on"));
     $("fullBtn").hidden = !(stage.requestFullscreen || stage.webkitRequestFullscreen) || document.fullscreenEnabled === false;
     $("roomBtn").setAttribute("aria-expanded", String(ui.drawer));
-    stage.classList.toggle("is-idle", ui.idle && !card && !ui.drawer && !timeline().paused);
+    if (card) ui.tray = false;
+    $("tray").hidden = !ui.tray;
+    stage.classList.toggle("has-tray", ui.tray);
+    $("reactBtn").setAttribute("aria-expanded", String(ui.tray));
+    stage.classList.toggle("is-idle", ui.idle && !card && !ui.drawer && !ui.tray && !timeline().paused);
     stage.classList.toggle("no-deck", !hosting && !guest.want);
 
     /* the settings */
@@ -1314,16 +1835,14 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     if (ui.drawer) {
       $("dInvite").hidden = !hosting; $("dFilm").hidden = !hosting;
       $("dCode").textContent = me.code;
-      $("dMicText").textContent = micWords();
-      $("dMic").textContent = mic.state === "on" || mic.state === "asking" ? "Turn off" : "Turn on";
-      $("meter").hidden = mic.state !== "on";
-      if (mic.state === "on") meterStart();
       $("dFilmName").textContent = film.error || (film.file ? film.file.name + (film.silent ? " (no sound this browser can play)" : "") : "No film chosen yet.");
       $("voiceVolLabel").textContent = Name(other) + "'s voice";
       $("quality").value = hosting ? film.quality : remote.q;
       $("quality").disabled = !hosting && !linked;
       $("leaveBtn").textContent = hosting ? "Close the room" : "Leave the room";
     }
+    paintMic();
+    paintPeople();
     paintDeck();
   }
 
@@ -1422,7 +1941,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     $("startBtn").addEventListener("click", () => { ui.lobby = false; poke(); paint(); });
     $("dLobby").addEventListener("click", () => { ui.lobby = true; ui.drawer = false; paint(); });
     $("joinBtn").addEventListener("click", join);
-    $("tapBtn").addEventListener("click", () => { ui.needTap = false; unlock(); tryPlay(); paint(); });
+    $("tapBtn").addEventListener("click", () => { ui.needTap = false; if (sound.ctx) soundCtx(); unlock(); tryPlay(); paint(); });
 
     $("playBtn").addEventListener("click", playPause);
     $("backBtn").addEventListener("click", () => skip(-10));
@@ -1432,7 +1951,23 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     seek.addEventListener("change", () => { ui.scrub = false; act("seek", Number(seek.value)); });
     $("micBtn").addEventListener("click", micToggle);
     $("dMic").addEventListener("click", micToggle);
-    $("roomBtn").addEventListener("click", () => { ui.drawer = !ui.drawer; paint(); paintFacts(); });
+    $("roomBtn").addEventListener("click", () => { ui.drawer = !ui.drawer; ui.tray = false; paint(); paintFacts(); if (ui.drawer) micList(false); });
+    $("lobbyMicBtn").addEventListener("click", () => { ui.drawer = true; paint(); micList(false); });
+    $("micPick").addEventListener("change", (ev) => micUse(ev.target.value));
+    $("micGain").addEventListener("input", (ev) => micSetGain(ev.target.value, false));
+    $("micGain").addEventListener("change", (ev) => micSetGain(ev.target.value, true));
+    $("micNoise").addEventListener("change", (ev) => micSetNoise(ev.target.value));
+    $("micTest").addEventListener("click", micTest);
+    $("reactBtn").addEventListener("click", trayToggle);
+    EMOJI.forEach((e, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "emo"; b.textContent = e[0];
+      b.setAttribute("aria-label", e[1]); b.title = e[1] + " (key " + (i + 1) + ")";
+      b.addEventListener("click", () => react(i));
+      $("tray").append(b);
+    });
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener("devicechange", () => micList(true));
+    beat.on(pulse);
     $("drawerClose").addEventListener("click", () => { ui.drawer = false; paint(); $("roomBtn").focus(); });
     $("fullBtn").addEventListener("click", toggleFull);
     $("leaveBtn").addEventListener("click", leave);
@@ -1465,12 +2000,14 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     stage.addEventListener("drop", (ev) => { if (me.role !== "host") return; ev.preventDefault(); const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) chooseFile(f); });
 
     ["pointermove", "pointerdown", "keydown"].forEach((name) => stage.addEventListener(name, poke, { passive: true }));
-    v.addEventListener("click", () => { if (ui.drawer) { ui.drawer = false; paint(); } });
+    stage.addEventListener("pointerdown", () => { if (sound.ctx && sound.ctx.state !== "running") soundCtx(); }, { passive: true });
+    v.addEventListener("click", () => { if (ui.drawer || ui.tray) { ui.drawer = false; ui.tray = false; paint(); } });
     v.addEventListener("dblclick", toggleFull);
     document.addEventListener("keydown", (ev) => {
       if (ui.view !== "stage" || ev.altKey || ev.ctrlKey || ev.metaKey) return;
       const tag = ev.target && ev.target.tagName;
       if (ev.key === "Escape" && ui.drawer) { ui.drawer = false; paint(); $("roomBtn").focus(); return; }
+      if (ev.key === "Escape" && ui.tray) { ui.tray = false; paint(); $("reactBtn").focus(); return; }
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || !$("veil").hidden) return;
       if (ev.key === " " && tag === "BUTTON") return;           // the space bar presses the button it is on
       if (ev.key === " " || ev.key === "k") { ev.preventDefault(); playPause(); }
@@ -1478,6 +2015,7 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
       else if (ev.key === "ArrowRight") { ev.preventDefault(); skip(10); }
       else if (ev.key === "f") toggleFull();
       else if (ev.key === "m") micToggle();
+      else if (ev.key.length === 1 && ev.key >= "1" && ev.key <= "8") react(Number(ev.key) - 1);
     });
     document.addEventListener("fullscreenchange", paint);
     document.addEventListener("visibilitychange", () => {
@@ -1496,6 +2034,11 @@ label, .label { display: block; font-size: .875rem; font-weight: 600; color: var
     if (who === "a" || who === "b") { me.id = who; me.idSet = true; store("local", KEEP.me, who); }
     else if (kept === "a" || kept === "b") { me.id = kept; me.idSet = true; }
     me.film = label(p.get("film"), 160);
+    mic.id = store("local", KEEP.mic);
+    const g = Number(store("local", KEEP.gain) || 0);
+    mic.gain = isFinite(g) ? clamp(Math.round(g), -20, 20) : 0;
+    const nz = store("local", KEEP.noise);
+    mic.noise = Object.prototype.hasOwnProperty.call(NOISE, nz) ? nz : "normal";
     const code = normCode(p.get("code"));
     if (!me.app) { show("setup"); return; }
     store("local", KEEP.app, me.app);
